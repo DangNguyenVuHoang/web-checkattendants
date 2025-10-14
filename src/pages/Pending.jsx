@@ -22,9 +22,9 @@ export default function Pending() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">📋 UID Pending Approval</h2>
+      {/* <h2 className="text-2xl font-bold mb-4">📋 UID Pending Approval</h2> */}
       {Object.keys(pending).length === 0 ? (
-        <p>Không có UID nào pending ✅</p>
+        <p>Không có UID nào pending!!!</p>
       ) : (
         <div className="grid gap-3">
           {Object.entries(pending).map(([uid, info]) => (

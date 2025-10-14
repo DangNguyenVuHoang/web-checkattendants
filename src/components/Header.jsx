@@ -48,7 +48,7 @@ export default function Header() {
           {/* Common Dashboard link - admins/classes/students land on different pages */}
           {logged ? (
             <Link to={role === "admin" ? "/admin/accounts" : role === "class" ? "/class" : role === "student" ? "/student" : "/dashboard"}
-              className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm">
+              className="px-3 py-1 rounded bg-gray-200 hover:bg-yellow-500 text-sm">
               Home
             </Link>
           ) : (
@@ -58,8 +58,8 @@ export default function Header() {
           {/* Admin-only */}
           {role === "admin" && (
             <>
-              <Link to="/admin/accounts" className="px-3 py-1 rounded bg-green-600 text-white text-sm hover:bg-green-700">Admin</Link>
-              <Link to="/dashboard" className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm">All Students</Link>
+              <Link to="/admin/accounts" className="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-green-700">Admin</Link>
+              <Link to="/dashboard" className="px-3 py-1 rounded bg-blue-600  text-white hover:bg-green-700 text-sm">All Students</Link>
             </>
           )}
 

@@ -1,5 +1,4 @@
-// src/App.jsx
-import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Header from "./components/Header";
 import Pending from "./pages/Pending";
 import StudentList from "./pages/StudentList";
@@ -8,101 +7,67 @@ import CardDetail from "./pages/CardDetail";
 import AdminAccounts from "./pages/AdminAccounts";
 import ClassAccounts from "./pages/ClassAccounts";
 import StudentAccounts from "./pages/StudentAccounts";
-
-/**
- * Helpers: role-based routes
- */
-function requireLoggedRole(expectedRole, children) {
-  const raw = localStorage.getItem("rfid_logged_user");
-  if (!raw) return <Navigate to="/login" replace />;
-  try {
-    const logged = JSON.parse(raw);
-    if (logged.role === expectedRole) return children;
-    return <Navigate to="/login" replace />;
-  } catch {
-    return <Navigate to="/login" replace />;
-  }
-}
-
-function AdminRoute({ children }) {
-  return requireLoggedRole("admin", children);
-}
-function ClassRoute({ children }) {
-  return requireLoggedRole("class", children);
-}
-function StudentRoute({ children }) {
-  return requireLoggedRole("student", children);
-}
+import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
-  // read logged (used only for constructing some link targets in Header)
-  const raw = localStorage.getItem("rfid_logged_user");
-  const logged = raw ? JSON.parse(raw) : null;
-
   return (
     <BrowserRouter>
       <div className="max-w-6xl mx-auto p-4">
-        {/* Shared header component handles role-aware nav / logout */}
         <Header />
-
         <main>
           <Routes>
-            {/* Root: theo yêu cầu hiện tại, mặc định về login */}
+            {/* Redirect root → login */}
             <Route path="/" element={<Navigate to="/login" replace />} />
 
-            {/* Public */}
+            {/* Public route */}
             <Route path="/login" element={<Login />} />
 
-            {/* Admin-only */}
+            {/* Admin-only routes */}
             <Route
               path="/admin/accounts"
               element={
-                <AdminRoute>
+                <ProtectedRoute roles={["admin"]}>
                   <AdminAccounts />
-                </AdminRoute>
+                </ProtectedRoute>
               }
             />
 
-            {/* Class-only */}
+            {/* Class-only routes */}
             <Route
               path="/class"
               element={
-                <ClassRoute>
+                <ProtectedRoute roles={["class"]}>
                   <ClassAccounts />
-                </ClassRoute>
+                </ProtectedRoute>
               }
             />
 
-            {/* Student-only */}
+            {/* Student-only routes */}
             <Route
               path="/student"
               element={
-                <StudentRoute>
+                <ProtectedRoute roles={["student"]}>
                   <StudentAccounts />
-                </StudentRoute>
+                </ProtectedRoute>
               }
             />
 
-            {/* General dashboard (optional): combine Pending + StudentList
-                You may want to protect this route for admin/class; keep public redirect */}
+            {/* Dashboard for admin & class */}
             <Route
               path="/dashboard"
               element={
-                raw && logged && (logged.role === "admin" || logged.role === "class") ? (
+                <ProtectedRoute roles={["admin", "class"]}>
                   <div className="grid gap-6">
-                    {/* <Pending /> */}
                     <StudentList />
                   </div>
-                ) : (
-                  <Navigate to="/login" replace />
-                )
+                </ProtectedRoute>
               }
             />
 
-            {/* View single card (CardDetail) — access control enforced inside the page */}
+            {/* View single card (no strict role restriction) */}
             <Route path="/card/:uid" element={<CardDetail />} />
 
-            {/* Fallback -> login */}
+            {/* Fallback */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </main>

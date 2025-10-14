@@ -1,87 +1,14 @@
-// import { useEffect, useState } from "react";
-// import { ref, onValue } from "firebase/database";
-// import { db } from "../firebase";
-// import ModalEditStudent from "../components/ModalEditStudent";
-
-// export default function StudentList() {
-//   const [students, setStudents] = useState({});
-//   const [editUID, setEditUID] = useState(null); // ✅ lưu uid đang được edit
-
-//   useEffect(() => {
-//     const userRef = ref(db, "USER");
-//     onValue(userRef, (snapshot) => {
-//       setStudents(snapshot.val() || {});
-//     });
-//   }, []);
-
-//   return (
-//     <div>
-//       <h3 className="text-xl font-semibold mb-4">Danh sách học sinh</h3>
-//       <div className="overflow-x-auto">
-//         <table className="min-w-full bg-white border rounded-lg">
-//           <thead className="bg-blue-600 text-white">
-//             <tr>
-//               <th className="p-2">UID</th>
-//               <th className="p-2">Họ tên</th>
-//               <th className="p-2">Phụ huynh</th>
-//               <th className="p-2">Lớp</th>
-//               <th className="p-2">SĐT PH</th>
-//               <th className="p-2">SĐT HS</th>
-//               <th className="p-2">Giới tính</th>
-//               <th className="p-2">Ngày sinh</th>
-//               <th className="p-2">Thao tác</th>
-//             </tr>
-//           </thead>
-//           <tbody>
-//             {Object.keys(students).length === 0 ? (
-//               <tr>
-//                 <td colSpan="9" className="text-center p-4">
-//                   Không có học sinh nào ❌
-//                 </td>
-//               </tr>
-//             ) : (
-//               Object.entries(students).map(([uid, s]) => (
-//                 <tr key={uid} className="border-b hover:bg-gray-100">
-//                   <td className="p-2">{uid}</td>
-//                   <td className="p-2">{s.name}</td>
-//                   <td className="p-2">{s.parentName}</td>
-//                   <td className="p-2">{s.class}</td>
-//                   <td className="p-2">{s.parentPhone}</td>
-//                   <td className="p-2">{s.phone}</td>
-//                   <td className="p-2">{s.gender}</td>
-//                   <td className="p-2">{s.dob}</td>
-//                   <td className="p-2 flex gap-2">
-//                     <button
-//                       className="bg-yellow-400 px-2 py-1 rounded hover:bg-yellow-500"
-//                       onClick={() => setEditUID(uid)}
-//                     >
-//                       ✏️
-//                     </button>
-//                     <button className="bg-red-500 text-white px-2 py-1 rounded">
-//                       🗑️
-//                     </button>
-//                     <button className="bg-green-500 text-white px-2 py-1 rounded">
-//                       ℹ️
-//                     </button>
-//                   </td>
-//                 </tr>
-//               ))
-//             )}
-//           </tbody>
-//         </table>
-//       </div>
-
-//       {/* ✅ Modal edit */}
-//       {editUID && (
-//         <ModalEditStudent uid={editUID} onClose={() => setEditUID(null)} />
-//       )}
-//     </div>
-//   );
-// }
+// src/pages/StudentList.jsx
 import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database";
 import { db } from "../firebase";
 import ModalEditStudent from "../components/ModalEditStudent";
+
+/**
+ * Responsive StudentList
+ * - Mobile / Tablet: cards (grid 1 -> 2 cols)
+ * - Laptop and up (lg): table
+ */
 
 export default function StudentList() {
   const [students, setStudents] = useState({});
@@ -119,38 +46,122 @@ export default function StudentList() {
     return false;
   });
 
+  // small helper to format DOB (if ISO) or leave as-is
+  const fmtDate = (d) => {
+    if (!d) return "-";
+    // if stored as yyyy-mm-dd or yyyy-mm-ddT...
+    if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
+      try {
+        const dt = new Date(d);
+        if (!isNaN(dt)) return dt.toLocaleDateString();
+      } catch {}
+    }
+    return d;
+  };
+
   return (
     <div>
-      <h3 className="text-xl font-semibold mb-4">Danh sách học sinh</h3>
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border rounded-lg">
-          <thead className="bg-blue-600 text-white">
-            <tr>
-              <th className="p-2">UID</th><th className="p-2">Họ tên</th><th className="p-2">Phụ huynh</th>
-              <th className="p-2">Lớp</th><th className="p-2">SĐT PH</th><th className="p-2">SĐT HS</th>
-              <th className="p-2">Giới tính</th><th className="p-2">Ngày sinh</th><th className="p-2">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleEntries.length === 0 ? (
-              <tr><td colSpan="9" className="text-center p-4">Không có học sinh nào</td></tr>
-            ) : visibleEntries.map(([uid, s]) => (
-              <tr key={uid} className="border-b hover:bg-gray-100">
-                <td className="p-2">{uid}</td>
-                <td className="p-2">{s.name}</td>
-                <td className="p-2">{s.parentName || "-"}</td>
-                <td className="p-2">{s.class}</td>
-                <td className="p-2">{s.parentPhone || "-"}</td>
-                <td className="p-2">{s.phone || "-"}</td>
-                <td className="p-2">{s.gender || "-"}</td>
-                <td className="p-2">{s.dob || "-"}</td>
-                <td className="p-2 flex gap-2">
-                  <button className="bg-yellow-400 px-2 py-1 rounded" onClick={() => setEditUID(uid)}>✏️</button>
-                </td>
-              </tr>
+      <div className="flex items-start justify-between mb-4">
+        <h3 className="text-xl font-semibold">Danh sách học sinh</h3>
+        <div className="text-sm text-gray-600">{visibleEntries.length} học sinh</div>
+      </div>
+
+      {/* Cards view: shown on screens < lg */}
+      <div className="block lg:hidden">
+        {visibleEntries.length === 0 ? (
+          <div className="text-center text-gray-500 p-6 bg-white rounded-lg shadow">Không có học sinh nào</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {visibleEntries.map(([uid, s]) => (
+              <div key={uid} className="bg-white p-4 rounded-lg shadow flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-gray-500 font-mono">{uid}</div>
+                    <div className="text-xs text-gray-400">{s.class || "-"}</div>
+                  </div>
+
+                  <div className="text-lg font-medium text-gray-800 mb-1 truncate">{s.name || "-"}</div>
+                  <div className="text-sm text-gray-600 mb-2">{s.parentName ? `Phụ huynh: ${s.parentName}` : "Phụ huynh: -"}</div>
+
+                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+                    <div><span className="text-gray-500">SĐT HS:</span> <span className="font-medium">{s.phone || "-"}</span></div>
+                    <div><span className="text-gray-500">SĐT PH:</span> <span className="font-medium">{s.parentPhone || "-"}</span></div>
+                    <div><span className="text-gray-500">Giới tính:</span> <span className="font-medium">{s.gender || "-"}</span></div>
+                    <div><span className="text-gray-500">Ngày sinh:</span> <span className="font-medium">{fmtDate(s.dob)}</span></div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <button
+                    onClick={() => setEditUID(uid)}
+                    className="flex-1 px-3 py-2 text-sm bg-yellow-400 hover:bg-yellow-500 rounded-md"
+                  >
+                    ✏️ Chỉnh sửa
+                  </button>
+
+                  <a
+                    href={`/card/${uid}`}
+                    className="px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-md text-center"
+                  >
+                    🔎 Xem
+                  </a>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        )}
+      </div>
+
+      {/* Table view: shown on lg and above */}
+      <div className="hidden lg:block">
+        <div className="overflow-x-auto bg-white rounded-lg shadow">
+          <table className="min-w-full divide-y">
+            <thead className="bg-blue-600 text-white">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium">UID</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Họ tên</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Phụ huynh</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Lớp</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">SĐT PH</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">SĐT HS</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Giới tính</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Ngày sinh</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y">
+              {visibleEntries.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="p-6 text-center text-gray-500">Không có học sinh nào</td>
+                </tr>
+              ) : (
+                visibleEntries.map(([uid, s]) => (
+                  <tr key={uid} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-sm">{uid}</td>
+                    <td className="px-4 py-3 text-sm">{s.name || "-"}</td>
+                    <td className="px-4 py-3 text-sm">{s.parentName || "-"}</td>
+                    <td className="px-4 py-3 text-sm">{s.class || "-"}</td>
+                    <td className="px-4 py-3 text-sm">{s.parentPhone || "-"}</td>
+                    <td className="px-4 py-3 text-sm">{s.phone || "-"}</td>
+                    <td className="px-4 py-3 text-sm">{s.gender || "-"}</td>
+                    <td className="px-4 py-3 text-sm">{fmtDate(s.dob)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditUID(uid)}
+                          className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 rounded-md"
+                        >
+                          ✏️
+                        </button>
+                        <a href={`/card/${uid}`} className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-md">🔎</a>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {editUID && <ModalEditStudent uid={editUID} onClose={() => setEditUID(null)} />}
