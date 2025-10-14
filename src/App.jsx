@@ -4,7 +4,10 @@ import Pending from "./pages/Pending";
 import StudentList from "./pages/StudentList";
 import Login from "./pages/Login";
 import CardDetail from "./pages/CardDetail";
-import AdminAccounts from "./pages/AdminAccounts";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminAccounts from "./pages/admin/AdminAccounts";
+import AdminHome from "./pages/admin/AdminHome";
+import AdminListStudents from "./pages/admin/AdminListStudents";
 import ClassAccounts from "./pages/ClassAccounts";
 import StudentAccounts from "./pages/StudentAccounts";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -22,15 +25,20 @@ export default function App() {
             {/* Public route */}
             <Route path="/login" element={<Login />} />
 
-            {/* Admin-only routes */}
+            {/* Admin routes with layout and nested routes */}
             <Route
-              path="/admin/accounts"
+              path="/admin"
               element={
                 <ProtectedRoute roles={["admin"]}>
-                  <AdminAccounts />
+                  <AdminLayout />
                 </ProtectedRoute>
               }
-            />
+            >
+              <Route index element={<AdminHome />} />
+              <Route path="home" element={<AdminHome />} />
+              <Route path="accounts" element={<AdminAccounts />} />
+              <Route path="liststudents" element={<AdminListStudents />} />
+            </Route>
 
             {/* Class-only routes */}
             <Route

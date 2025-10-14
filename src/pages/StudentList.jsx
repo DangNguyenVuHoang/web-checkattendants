@@ -1,19 +1,24 @@
 // src/pages/StudentList.jsx
 import { useEffect, useState } from "react";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, remove } from "firebase/database";
 import { db } from "../firebase";
 import ModalEditStudent from "../components/ModalEditStudent";
+import toast from "react-hot-toast";
 
-/**
- * Responsive StudentList
- * - Mobile / Tablet: cards (grid 1 -> 2 cols)
- * - Laptop and up (lg): table
- */
+const PAGE_SIZE = 8;
 
 export default function StudentList() {
   const [students, setStudents] = useState({});
   const [editUID, setEditUID] = useState(null);
   const [classStudentUIDs, setClassStudentUIDs] = useState(new Set());
+  const [page, setPage] = useState(1);
+
+  // Bộ lọc
+  const [search, setSearch] = useState("");
+  const [filterClass, setFilterClass] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [classOptions, setClassOptions] = useState([]);
 
   useEffect(() => {
     const userRef = ref(db, "USER");
@@ -35,21 +40,56 @@ export default function StudentList() {
     return () => unsub();
   }, []);
 
+  // Lấy danh sách lớp học cho filter
+  useEffect(() => {
+    const cRef = ref(db, "Class");
+    const unsub = onValue(cRef, (snap) => {
+      const v = snap.val() || {};
+      setClassOptions(Object.keys(v));
+    });
+    return () => unsub();
+  }, []);
+
   const loggedRaw = localStorage.getItem("rfid_logged_user");
   const logged = loggedRaw ? JSON.parse(loggedRaw) : null;
 
-  const visibleEntries = Object.entries(students).filter(([uid, s]) => {
-    if (!logged) return false;
-    if (logged.role === "admin") return true;
-    if (logged.role === "class") return classStudentUIDs.has(uid);
-    if (logged.role === "student") return uid === logged.uid;
-    return false;
-  });
+  // Lọc dữ liệu + Sắp xếp theo createdAt mới nhất
+  const visibleEntries = Object.entries(students)
+    .filter(([uid, s]) => {
+      if (!logged) return false;
+      if (logged.role === "admin") return true;
+      if (logged.role === "class") return classStudentUIDs.has(uid);
+      if (logged.role === "student") return uid === logged.uid;
+      return false;
+    })
+    .filter(([uid, s]) => {
+      // Search theo tên
+      if (search && !(s.name || "").toLowerCase().includes(search.toLowerCase())) return false;
+      // Lọc theo lớp
+      if (filterClass && s.class !== filterClass) return false;
+      // Lọc theo ngày sinh
+      if (filterDateFrom) {
+        const dob = s.dob ? new Date(s.dob) : null;
+        if (!dob || dob < new Date(filterDateFrom)) return false;
+      }
+      if (filterDateTo) {
+        const dob = s.dob ? new Date(s.dob) : null;
+        if (!dob || dob > new Date(filterDateTo)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const createdA = a[1].createdAt ? new Date(a[1].createdAt).getTime() : 0;
+      const createdB = b[1].createdAt ? new Date(b[1].createdAt).getTime() : 0;
+      return createdB - createdA; // Mới nhất lên đầu
+    });
 
-  // small helper to format DOB (if ISO) or leave as-is
+  // Phân trang
+  const totalPages = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE));
+  const pagedEntries = visibleEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const fmtDate = (d) => {
     if (!d) return "-";
-    // if stored as yyyy-mm-dd or yyyy-mm-ddT...
     if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
       try {
         const dt = new Date(d);
@@ -59,30 +99,83 @@ export default function StudentList() {
     return d;
   };
 
+  const handleDeleteStudent = async (uid) => {
+    if (window.confirm("Bạn có chắc muốn xoá học sinh này?")) {
+      try {
+        await remove(ref(db, `USER/${uid}`));
+        toast.success("Đã xoá học sinh");
+      } catch (err) {
+        console.error(err);
+        toast.error("Lỗi xoá học sinh");
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [visibleEntries.length, totalPages, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterClass, filterDateFrom, filterDateTo, visibleEntries.length]);
+
   return (
     <div>
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-2">
         <h3 className="text-xl font-semibold">Danh sách học sinh</h3>
-        <div className="text-sm text-gray-600">{visibleEntries.length} học sinh</div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <input
+            type="text"
+            placeholder="Tìm theo tên học sinh..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+          />
+          <select
+            value={filterClass}
+            onChange={e => setFilterClass(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+          >
+            <option value="">Tất cả lớp</option>
+            {classOptions.map(cls => (
+              <option key={cls} value={cls}>{cls}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={e => setFilterDateFrom(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+            placeholder="Từ ngày sinh"
+          />
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={e => setFilterDateTo(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+            placeholder="Đến ngày sinh"
+          />
+        </div>
+        <div className="text-sm text-gray-600">
+          {visibleEntries.length} học sinh &nbsp;|&nbsp; Trang {page}/{totalPages}
+        </div>
       </div>
 
       {/* Cards view: shown on screens < lg */}
       <div className="block lg:hidden">
-        {visibleEntries.length === 0 ? (
+        {pagedEntries.length === 0 ? (
           <div className="text-center text-gray-500 p-6 bg-white rounded-lg shadow">Không có học sinh nào</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {visibleEntries.map(([uid, s]) => (
+            {pagedEntries.map(([uid, s]) => (
               <div key={uid} className="bg-white p-4 rounded-lg shadow flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm text-gray-500 font-mono">{uid}</div>
                     <div className="text-xs text-gray-400">{s.class || "-"}</div>
                   </div>
-
                   <div className="text-lg font-medium text-gray-800 mb-1 truncate">{s.name || "-"}</div>
                   <div className="text-sm text-gray-600 mb-2">{s.parentName ? `Phụ huynh: ${s.parentName}` : "Phụ huynh: -"}</div>
-
                   <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
                     <div><span className="text-gray-500">SĐT HS:</span> <span className="font-medium">{s.phone || "-"}</span></div>
                     <div><span className="text-gray-500">SĐT PH:</span> <span className="font-medium">{s.parentPhone || "-"}</span></div>
@@ -90,7 +183,6 @@ export default function StudentList() {
                     <div><span className="text-gray-500">Ngày sinh:</span> <span className="font-medium">{fmtDate(s.dob)}</span></div>
                   </div>
                 </div>
-
                 <div className="mt-4 flex items-center gap-2">
                   <button
                     onClick={() => setEditUID(uid)}
@@ -98,13 +190,18 @@ export default function StudentList() {
                   >
                     ✏️ Chỉnh sửa
                   </button>
-
                   <a
                     href={`/card/${uid}`}
                     className="px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-md text-center"
                   >
                     🔎 Xem
                   </a>
+                  <button
+                    onClick={() => handleDeleteStudent(uid)}
+                    className="px-3 py-2 text-sm bg-gray-100 text-black rounded-md hover:bg-red-500 transition-colors"
+                  >
+                    🗑️ Xoá
+                  </button>
                 </div>
               </div>
             ))}
@@ -116,26 +213,26 @@ export default function StudentList() {
       <div className="hidden lg:block">
         <div className="overflow-x-auto bg-white rounded-lg shadow">
           <table className="min-w-full divide-y">
-            <thead className="bg-blue-600 text-white">
+            <thead className="bg-blue-400 text-black">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium">UID</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Họ tên</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Phụ huynh</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Lớp</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">SĐT PH</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">SĐT HS</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Giới tính</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Ngày sinh</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Thao tác</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">UID</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">Họ tên</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">Phụ huynh</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">Lớp</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">SĐT PH</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">SĐT HS</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">Giới tính</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">Ngày sinh</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">Thao tác</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y">
-              {visibleEntries.length === 0 ? (
+              {pagedEntries.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="p-6 text-center text-gray-500">Không có học sinh nào</td>
                 </tr>
               ) : (
-                visibleEntries.map(([uid, s]) => (
+                pagedEntries.map(([uid, s]) => (
                   <tr key={uid} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-sm">{uid}</td>
                     <td className="px-4 py-3 text-sm">{s.name || "-"}</td>
@@ -154,6 +251,12 @@ export default function StudentList() {
                           ✏️
                         </button>
                         <a href={`/card/${uid}`} className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-md">🔎</a>
+                        <button
+                          onClick={() => handleDeleteStudent(uid)}
+                          className="px-3 py-1 bg-gray-100 text-black rounded-md hover:bg-red-500 transition-colors"
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -163,6 +266,31 @@ export default function StudentList() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+          <div className="text-sm text-gray-600">
+            Trang {page} / {totalPages}
+          </div>
+        </div>
+      )}
 
       {editUID && <ModalEditStudent uid={editUID} onClose={() => setEditUID(null)} />}
     </div>

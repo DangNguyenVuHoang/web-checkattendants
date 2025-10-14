@@ -1,11 +1,57 @@
+// // src/pages/admin/AdminHome.jsx
+// import Pending from "../../pages/Pending";
+// import { useEffect, useState } from "react";
+// import { ref, onValue } from "firebase/database";
+// import { db } from "../../firebase";
+
+// export default function AdminHome() {
+//   const [counts, setCounts] = useState({ pending: 0, students: 0, classes: 0 });
+
+//   useEffect(() => {
+//     const pRef = ref(db, "Pending");
+//     const uRef = ref(db, "USER");
+//     const cRef = ref(db, "Class");
+
+//     const unsubP = onValue(pRef, (s) => setCounts((c) => ({ ...c, pending: s.exists() ? Object.keys(s.val() || {}).length : 0 })));
+//     const unsubU = onValue(uRef, (s) => setCounts((c) => ({ ...c, students: s.exists() ? Object.keys(s.val() || {}).length : 0 })));
+//     const unsubC = onValue(cRef, (s) => setCounts((c) => ({ ...c, classes: s.exists() ? Object.keys(s.val() || {}).length : 0 })));
+
+//     return () => { unsubP(); unsubU(); unsubC(); };
+//   }, []);
+
+//   return (
+//     <div className="space-y-6">
+//       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+//         <div className="p-4 bg-white rounded-lg shadow">
+//           <div className="text-sm text-gray-500">Pending</div>
+//           <div className="text-2xl font-bold">{counts.pending}</div>
+//         </div>
+//         <div className="p-4 bg-white rounded-lg shadow">
+//           <div className="text-sm text-gray-500">Students</div>
+//           <div className="text-2xl font-bold">{counts.students}</div>
+//         </div>
+//         <div className="p-4 bg-white rounded-lg shadow">
+//           <div className="text-sm text-gray-500">Classes</div>
+//           <div className="text-2xl font-bold">{counts.classes}</div>
+//         </div>
+//       </div>
+
+//       <div className="bg-white p-4 rounded-lg shadow">
+//         <h4 className="font-semibold mb-2">Recent Pending</h4>
+//         {/* reuse Pending component but it may show full UI; if Pending is heavy you can create a lightweight summary */}
+//         <Pending adminMode={true} maxItems={6} />
+//       </div>
+//     </div>
+//   );
+// }
 // src/pages/AdminAccounts.jsx
 import { useEffect, useState } from "react";
-import { ref, set, get, onValue } from "firebase/database";
-import { db } from "../firebase";
+import { ref, set, get, onValue, remove } from "firebase/database"; // thêm remove
+import { db } from "../../firebase";
 import bcrypt from "bcryptjs";
 import toast from "react-hot-toast";
-import ModalApprove from "../components/ModalApprove";
-import ModalEditStudent from "../components/ModalEditStudent";
+import ModalApprove from "../../components/ModalApprove";
+import ModalEditStudent from "../../components/ModalEditStudent";
 import { Link } from "react-router-dom";
 
 /**
@@ -74,8 +120,12 @@ export default function AdminAccounts() {
         uid,
         ...(val[uid] || {}),
       }));
-      // sort by time desc (if time present)
-      arr.sort((a, b) => parseVNDateTime(b.time) - parseVNDateTime(a.time));
+      // Sắp xếp theo time mới nhất lên đầu bảng
+      arr.sort((a, b) => {
+        const ta = parseVNDateTime(a.time);
+        const tb = parseVNDateTime(b.time);
+        return tb - ta; // Mới nhất lên đầu
+      });
       setPendingArr(arr);
       // reset page if out of range
       setPendingPage((cur) => {
@@ -92,12 +142,11 @@ export default function AdminAccounts() {
     const unsub = onValue(uRef, (snap) => {
       const val = snap.val() || {};
       const arr = Object.keys(val).map((uid) => ({ uid, ...(val[uid] || {}) }));
-      // sort alphabetically by name (fallback to uid)
+      // Sắp xếp theo createdAt mới nhất lên đầu
       arr.sort((a, b) => {
-        const na = (a.name || "").toLowerCase();
-        const nb = (b.name || "").toLowerCase();
-        if (na === nb) return (a.uid || "").localeCompare(b.uid || "");
-        return na.localeCompare(nb);
+        const ca = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const cb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return cb - ca; // Mới nhất lên đầu
       });
       setStudentsArr(arr);
       setStudentsPage((cur) => {
@@ -158,6 +207,19 @@ export default function AdminAccounts() {
     }
   };
 
+  // Xử lý xoá học sinh
+  const handleDeleteStudent = async (uid) => {
+    if (window.confirm("Bạn có chắc muốn xoá học sinh này?")) {
+      try {
+        await remove(ref(db, `USER/${uid}`));
+        toast.success("Đã xoá học sinh");
+      } catch (err) {
+        console.error(err);
+        toast.error("Lỗi xoá học sinh");
+      }
+    }
+  };
+
   // pagination helpers
   const pendingTotalPages = Math.max(1, Math.ceil(pendingArr.length / PAGE_SIZE));
   const studentsTotalPages = Math.max(1, Math.ceil(studentsArr.length / PAGE_SIZE));
@@ -169,7 +231,7 @@ export default function AdminAccounts() {
     <div className="space-y-8">
       {/* --- Section 1: Tạo tài khoản --- */}
       <section className="bg-white p-6 rounded-2xl shadow-md border">
-        <h3 className="text-xl font-semibold mb-6 text-gray-800">🧩 Tạo tài khoản Admin / Class</h3>
+        <h3 className="text-xl font-semibold mb-6 text-gray-800">⚙️ Tạo tài khoản Admin / Class</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
@@ -233,7 +295,7 @@ export default function AdminAccounts() {
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-gray-100">
+                <thead className="bg-blue-400">
                   <tr>
                     <th className="p-2 text-left">UID</th>
                     <th className="p-2 text-left">Trạng thái</th>
@@ -304,7 +366,7 @@ export default function AdminAccounts() {
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-gray-100">
+                <thead className="bg-blue-400">
                   <tr>
                     <th className="p-2 text-left">UID</th>
                     <th className="p-2 text-left">Họ và tên học sinh</th>
@@ -322,10 +384,16 @@ export default function AdminAccounts() {
                       <td className="p-2">{s.class || "-"}</td>
                       <td className="p-2">{s.parentName || "-"}</td>
                       <td className="p-2">{s.parentPhone || s.phone || "-"}</td>
-                      <td className="p-2">
+                      <td className="p-2 text-center">
                         <div className="flex gap-2">
                           <button onClick={() => setEditUID(s.uid)} className="px-2 py-1 bg-yellow-400 rounded text-sm">✏️</button>
                           <Link to={`/card/${s.uid}`} className="px-2 py-1 bg-gray-200 rounded text-sm">Xem</Link>
+                          <button
+                            onClick={() => handleDeleteStudent(s.uid)}
+                            className="px-2 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                          >
+                            Xoá
+                          </button>
                         </div>
                       </td>
                     </tr>
