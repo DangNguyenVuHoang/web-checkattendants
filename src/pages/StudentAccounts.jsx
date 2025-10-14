@@ -98,10 +98,10 @@ export default function StudentAccounts() {
         )}
       </div>
 
-      <div className="flex gap-3">
+      {/* <div className="flex gap-3">
         <button onClick={() => { localStorage.removeItem("rfid_logged_user"); navigate("/login"); }} className="px-3 py-2 bg-gray-300 rounded">Logout</button>
         <button onClick={() => navigate("/dashboard")} className="px-3 py-2 bg-blue-600 text-white rounded">Về Dashboard</button>
-      </div>
+      </div> */}
     </div>
   );
 }

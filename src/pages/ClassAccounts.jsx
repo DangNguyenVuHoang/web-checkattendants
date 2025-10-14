@@ -4,12 +4,6 @@ import { ref, onValue, get } from "firebase/database";
 import { db } from "../firebase";
 import { Link, useNavigate } from "react-router-dom";
 
-/**
- * ClassAccounts
- * - Hiển thị danh sách học sinh thuộc classManaged (Class/{classManaged}/students)
- * - Cho link mở chi tiết thẻ (/card/:uid)
- * - Nếu không phải class account hoặc không có classManaged -> redirect /login
- */
 export default function ClassAccounts() {
   const navigate = useNavigate();
   const raw = localStorage.getItem("rfid_logged_user");
@@ -18,6 +12,11 @@ export default function ClassAccounts() {
 
   const [students, setStudents] = useState({}); // { uid: { uid, name, createdAt } }
   const [usersMap, setUsersMap] = useState({}); // full USER data for uids
+  const [search, setSearch] = useState("");
+  const [filterGender, setFilterGender] = useState("");
+  const [filterClass, setFilterClass] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 8;
 
   useEffect(() => {
     if (!logged) { navigate("/login"); return; }
@@ -43,57 +42,177 @@ export default function ClassAccounts() {
 
   if (!logged) return null;
 
-  return (
-    <div>
-      <h2 className="text-xl font-semibold mb-4">Trang lớp: {className}</h2>
+  // Lấy danh sách lớp trong lớp này (nếu có)
+  const classOptions = Array.from(new Set(Object.values(usersMap).map(u => u.class).filter(Boolean)));
 
-      <div className="bg-white p-4 rounded shadow mb-6">
-        <h3 className="font-semibold mb-2">Danh sách học sinh ({Object.keys(students).length})</h3>
-        {Object.keys(students).length === 0 ? (
-          <div className="text-sm text-gray-500">Hiện chưa có học sinh trong lớp này.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-100">
+  // Lọc và search
+  const filtered = Object.entries(students)
+    .filter(([uid, s]) => {
+      const u = usersMap[uid] || {};
+      if (search && !(u.name || s.name || "").toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterGender && (u.gender || "-") !== filterGender) return false;
+      if (filterClass && (u.class || "") !== filterClass) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Sắp xếp theo createdAt mới nhất lên đầu
+      const ca = (usersMap[a[0]]?.createdAt || a[1]?.createdAt) ? new Date(usersMap[a[0]]?.createdAt || a[1]?.createdAt).getTime() : 0;
+      const cb = (usersMap[b[0]]?.createdAt || b[1]?.createdAt) ? new Date(usersMap[b[0]]?.createdAt || b[1]?.createdAt).getTime() : 0;
+      return cb - ca;
+    });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterGender, filterClass, Object.keys(students).length]);
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8">
+      <h2 className="text-xl md:text-2xl font-semibold mb-4 text-blue-700">Trang lớp: {className}</h2>
+
+      {/* Bộ lọc + search */}
+      <div className="bg-white p-4 rounded-xl shadow mb-6 flex flex-col md:flex-row md:items-center gap-3">
+        <input
+          type="text"
+          placeholder="Tìm theo tên học sinh..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="border rounded px-2 py-1 text-sm w-full md:w-56"
+        />
+        <select
+          value={filterGender}
+          onChange={e => setFilterGender(e.target.value)}
+          className="border rounded px-2 py-1 text-sm w-full md:w-40"
+        >
+          <option value="">Tất cả giới tính</option>
+          <option value="Nam">Nam</option>
+          <option value="Nữ">Nữ</option>
+        </select>
+        <select
+          value={filterClass}
+          onChange={e => setFilterClass(e.target.value)}
+          className="border rounded px-2 py-1 text-sm w-full md:w-40"
+        >
+          <option value="">Tất cả lớp</option>
+          {classOptions.map(cls => (
+            <option key={cls} value={cls}>{cls}</option>
+          ))}
+        </select>
+        <div className="text-sm text-gray-600 ml-auto">
+          Tổng: {filtered.length} | Trang {page}/{totalPages}
+        </div>
+      </div>
+
+      {/* Responsive table/cards */}
+      <div className="bg-white p-2 sm:p-4 rounded-xl shadow">
+        {/* Mobile: cards */}
+        <div className="block md:hidden">
+          {paged.length === 0 ? (
+            <div className="text-sm text-gray-500 p-4">Hiện chưa có học sinh trong lớp này.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {paged.map(([uid, s]) => {
+                const u = usersMap[uid] || {};
+                return (
+                  <div key={uid} className="bg-gray-50 rounded-lg p-4 shadow flex flex-col justify-between">
+                    <div>
+                      <div className="font-semibold text-blue-700 mb-1">{u.name || s.name || "-"}</div>
+                      <div className="text-xs text-gray-500 mb-2">UID: <span className="font-mono">{uid}</span></div>
+                      <div className="text-sm mb-1"><b>Lớp:</b> {u.class || className}</div>
+                      <div className="text-sm mb-1"><b>Giới tính:</b> {u.gender || "-"}</div>
+                      <div className="text-sm mb-1"><b>Ngày sinh:</b> {u.dob || "-"}</div>
+                      <div className="text-sm mb-1"><b>Ngày tạo:</b> {u.createdAt || s.createdAt || "-"}</div>
+                      <div className="text-sm mb-1"><b>Phụ huynh:</b> {u.parentName || "-"}</div>
+                      <div className="text-sm mb-1"><b>SĐT phụ huynh:</b> {u.parentPhone || "-"}</div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Link to={`/card/${uid}`} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Xem thẻ</Link>
+                      <button
+                        className="px-3 py-1 bg-gray-200 rounded text-sm"
+                        onClick={() => navigate(`/card/${uid}`)}
+                      >Chi tiết</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {/* Tablet/Laptop: table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-blue-400">
+              <tr>
+                <th className="p-2 text-left">UID</th>
+                <th className="p-2 text-left">Họ tên</th>
+                <th className="p-2 text-left">Ngày tạo</th>
+                <th className="p-2 text-left">Lớp</th>
+                <th className="p-2 text-left">Giới tính</th>
+                <th className="p-2 text-left">Ngày sinh</th>
+                <th className="p-2 text-left">Phụ huynh</th>
+                <th className="p-2 text-left">SĐT phụ huynh</th>
+                <th className="p-2 text-left">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.length === 0 ? (
                 <tr>
-                  <th className="p-2 text-left">UID</th>
-                  <th className="p-2 text-left">Họ tên</th>
-                  <th className="p-2 text-left">Ngày tạo</th>
-                  <th className="p-2 text-left">Lớp</th>
-                  <th className="p-2 text-left">Thao tác</th>
+                  <td colSpan={9} className="p-4 text-center text-gray-500">Hiện chưa có học sinh trong lớp này.</td>
                 </tr>
-              </thead>
-              <tbody>
-                {Object.entries(students).map(([uid, s]) => {
+              ) : (
+                paged.map(([uid, s]) => {
                   const u = usersMap[uid] || {};
                   return (
-                    <tr key={uid} className="border-t hover:bg-gray-50">
+                    <tr key={uid} className="border-t hover:bg-blue-50">
                       <td className="p-2">{uid}</td>
                       <td className="p-2">{u.name || s.name || "-"}</td>
-                      <td className="p-2">{s.createdAt || "-"}</td>
+                      <td className="p-2">{u.createdAt || s.createdAt || "-"}</td>
                       <td className="p-2">{u.class || className}</td>
+                      <td className="p-2">{u.gender || "-"}</td>
+                      <td className="p-2">{u.dob || "-"}</td>
+                      <td className="p-2">{u.parentName || "-"}</td>
+                      <td className="p-2">{u.parentPhone || "-"}</td>
                       <td className="p-2">
                         <div className="flex gap-2">
                           <Link to={`/card/${uid}`} className="px-2 py-1 bg-blue-600 text-white rounded text-sm">Xem thẻ</Link>
-                          <button className="px-2 py-1 bg-gray-200 rounded text-sm" onClick={() => {
-                            // quick navigate to student details page if exists
-                            navigate(`/card/${uid}`);
-                          }}>Chi tiết</button>
+                          <button className="px-2 py-1 bg-gray-200 rounded text-sm" onClick={() => navigate(`/card/${uid}`)}>Chi tiết</button>
                         </div>
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* <div className="flex gap-3">
-        <button onClick={() => { localStorage.removeItem("rfid_logged_user"); navigate("/login"); }} className="px-3 py-2 bg-gray-300 rounded">Logout</button>
-        <button onClick={() => navigate("/dashboard")} className="px-3 py-2 bg-blue-600 text-white rounded">Về Dashboard</button>
-      </div> */}
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+          <div className="text-sm text-gray-600">
+            Trang {page} / {totalPages}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
