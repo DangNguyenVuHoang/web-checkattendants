@@ -1,241 +1,235 @@
 // src/components/Header.jsx
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  Home,
+  Users,
+  ListChecks,
+  LogOut,
+  Bell,
+  IdCard,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 /**
- * Header component (simple + hover preserved)
- * - NavLink bây giờ không xử lý active state, chỉ render Link với lớp CSS mặc định
- * - Admin mini-panel + mobile menu giữ nguyên
+ * Sidebar (collapsible)
+ * - Nhận `collapsed` và `setCollapsed` từ App.jsx
+ * - Đồng bộ co/giãn toàn layout
+ * - Mobile có drawer riêng
  */
-
-function NavLink({ to, children, activeLink, setActiveLink, className = "" }) {
-  const isActive = activeLink === to;
-  const base =
-    "px-3 py-1 rounded text-sm text-black transition-colors " +
-    (isActive
-      ? "bg-blue-600 text-white"
-      : "bg-gray-100 hover:bg-gray-200");
-  return (
-    <Link
-      to={to}
-      className={base + " " + className}
-      onClick={() => setActiveLink(to)}
-    >
-      {children}
-    </Link>
-  );
-}
-
-export default function Header() {
+export default function Header({ collapsed, setCollapsed }) {
   const navigate = useNavigate();
-  const [activeLink, setActiveLink] = useState(null);
+  const location = useLocation();
+
+  const [open, setOpen] = useState(false); // mobile drawer
+  const [active, setActive] = useState(location.pathname);
 
   const loggedRaw = localStorage.getItem("rfid_logged_user");
   const logged = loggedRaw ? JSON.parse(loggedRaw) : null;
   const role = logged?.role || null;
   const username = logged?.username || null;
 
+  useEffect(() => {
+    setActive(location.pathname);
+    setOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = () => {
     localStorage.removeItem("rfid_logged_user");
     navigate("/login");
-    setActiveLink("/login");
   };
 
+  const navItem = (to, label, Icon) => {
+    const isActive = active === to || (to !== "/" && active?.startsWith(to));
+    return (
+      <Link
+        to={to}
+        key={to}
+        onClick={() => setActive(to)}
+        className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+          isActive
+            ? "bg-blue-600 text-white"
+            : "bg-gray-100 text-gray-800 hover:bg-blue-100"
+        }`}
+        title={collapsed ? label : undefined}
+      >
+        <Icon size={18} className="min-w-[18px]" />
+        {!collapsed && <span>{label}</span>}
+      </Link>
+    );
+  };
+
+  // default landing page per role
+  const homeTarget =
+    role === "admin"
+      ? "/admin/home"
+      : role === "class"
+      ? "/class/home"
+      : role === "student"
+      ? "/students/home"
+      : "/login";
+
   return (
-    <header className="flex items-center justify-between mb-6">
-      {/* left: brand + main nav */}
-      <div className="flex items-center gap-4">
-        <Link
-          to={
-            logged
-              ? role === "admin"
-                ? "/admin/home"
-                : role === "class"
-                ? "/class"
-                : role === "student"
-                ? "/student"
-                : "/dashboard"
-              : "/login"
-          }
-          className="text-xl font-bold"
-          onClick={() =>
-            setActiveLink(
-              logged
-                ? role === "admin"
-                  ? "/admin/home"
-                  : role === "class"
-                  ? "/class"
-                  : role === "student"
-                  ? "/student"
-                  : "/dashboard"
-                : "/login"
-            )
-          }
-        >
-          RFID Dashboard
-        </Link>
-
-        {/* main desktop nav */}
-        <nav className="hidden sm:flex gap-2 items-center">
-          <NavLink
-            to={
-              logged
-                ? role === "admin"
-                  ? "/admin/home"
-                  : role === "class"
-                  ? "/class"
-                  : role === "student"
-                  ? "/student"
-                  : "/dashboard"
-                : "/login"
-            }
-            activeLink={activeLink}
-            setActiveLink={setActiveLink}
+    <>
+      {/* =========================
+          Top bar (mobile)
+      ========================== */}
+      <div className="md:hidden flex items-center justify-between p-3 bg-white border-b">
+        <div className="flex items-center gap-3">
+          <button
+            aria-label="Toggle menu"
+            onClick={() => setOpen((s) => !s)}
+            className="p-2 rounded-md bg-gray-100 hover:bg-blue-100"
           >
-            Home
-          </NavLink>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
 
-          {role === "admin" && (
-            <>
-              <NavLink to="/admin/home" activeLink={activeLink} setActiveLink={setActiveLink}>Admin Home</NavLink>
-              <NavLink to="/admin/liststudents" activeLink={activeLink} setActiveLink={setActiveLink}>List Students</NavLink>
-              <NavLink to="/admin/accounts" activeLink={activeLink} setActiveLink={setActiveLink}>Accounts</NavLink>
-            </>
-          )}
+          <Link
+            to={homeTarget}
+            className="text-lg font-bold"
+            onClick={() => setActive(homeTarget)}
+          >
+            Thuận Hiếu Education
+          </Link>
+        </div>
 
-          {role === "class" && (
-            <>
-              <NavLink to="/class" activeLink={activeLink} setActiveLink={setActiveLink}>Class</NavLink>
-              <NavLink to="/dashboard" activeLink={activeLink} setActiveLink={setActiveLink}>Class Dashboard</NavLink>
-            </>
-          )}
-
-          {role === "student" && (
-            <NavLink to="/student" activeLink={activeLink} setActiveLink={setActiveLink}>My Card</NavLink>
-          )}
-        </nav>
-      </div>
-
-      {/* right: user info + admin mini-panel (desktop) + mobile menu */}
-      <div className="flex items-center gap-3">
-        {/* Admin mini-panel (desktop) */}
-        {role === "admin" && (
-          <div className="hidden md:block relative">
-            <details className="relative">
-              <summary className="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 cursor-pointer">
-                Admin Panel
-              </summary>
-
-              <div className="absolute right-0 mt-2 w-96 bg-white border rounded-lg shadow-lg z-50 p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold">Admin Panel</h3>
-                    <p className="text-sm text-gray-500">
-                      Quản trị hệ thống — quản lý accounts, pending, danh sách học sinh...
-                    </p>
-                  </div>
-                  <div className="ml-4">
-                    <button
-                      onClick={handleLogout}
-                      className="px-3 py-1 rounded bg-red-500 text-white text-sm hover:bg-red-600 focus:bg-blue-600 active:bg-blue-600 focus:text-white active:text-white transition-colors"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                </div>
-
-                <nav className="mt-4 grid grid-cols-1 gap-2">
-                  <Link to="/admin/home" className="px-3 py-2 rounded text-sm bg-gray-100 hover:bg-gray-200">
-                    Home
-                  </Link>
-                  <Link to="/admin/liststudents" className="px-3 py-2 rounded text-sm bg-gray-100 hover:bg-gray-200">
-                    List Students
-                  </Link>
-                  <Link to="/admin/accounts" className="px-3 py-2 rounded text-sm bg-gray-100 hover:bg-gray-200">
-                    Accounts
-                  </Link>
-                </nav>
-              </div>
-            </details>
-          </div>
-        )}
-
-        {/* username + logout (non-admin shows logout inline) */}
         {username ? (
-          <>
-            <div className="text-sm text-gray-700 mr-2 hidden sm:block">
-              <span className="font-medium">{username}</span>
-              <span className="text-xs text-gray-500"> ({role})</span>
-            </div>
-
-            {role !== "admin" && (
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1 rounded bg-red-500 text-white text-sm hover:bg-red-600 focus:bg-blue-600 active:bg-blue-600 focus:text-white active:text-white transition-colors"
-              >
-                Logout
-              </button>
-            )}
-          </>
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-medium">{username}</div>
+          </div>
         ) : (
-          <Link to="/login" className="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">
+          <Link
+            to="/login"
+            className="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+          >
             Login
           </Link>
         )}
+      </div>
 
-        {/* Mobile menu: includes admin links */}
-        <div className="sm:hidden">
-          <details className="relative">
-            <summary className="px-2 py-1 bg-gray-100 rounded hover:bg-gray-200">Menu</summary>
-            <div className="absolute right-0 mt-2 p-3 bg-white border rounded shadow w-56 z-50">
-              {username ? (
-                <>
-                  <div className="text-sm font-medium mb-2">
-                    {username} <span className="text-xs text-gray-500">({role})</span>
-                  </div>
-                  <ul className="space-y-1">
-                    <li>
-                      <Link
-                        to={role === "admin" ? "/admin/home" : role === "class" ? "/class" : role === "student" ? "/student" : "/dashboard"}
-                        className="block px-2 py-1 hover:bg-gray-50 rounded"
-                      >
-                        Home
-                      </Link>
-                    </li>
+      {/* =========================
+          Desktop Sidebar
+      ========================== */}
+      <div
+        className={`hidden md:fixed md:inset-y-0 md:left-0 ${
+          collapsed ? "md:w-20" : "md:w-64"
+        } md:flex md:flex-col md:justify-between 
+        md:bg-white md:border-r transition-all duration-300`}
+      >
+        {/* --- Top Section --- */}
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b">
+            {!collapsed ? (
+              <Link
+                to={homeTarget}
+                className="text-lg font-bold text-blue-700"
+                onClick={() => setActive(homeTarget)}
+              >
+                Thuận Hiếu Education
+              </Link>
+            ) : (
+              <Link
+                to={homeTarget}
+                onClick={() => setActive(homeTarget)}
+                title="Thuận Hiếu Education"
+              >
+                <Home size={22} className="text-blue-700" />
+              </Link>
+            )}
 
-                    {role === "admin" && (
-                      <>
-                        <li><Link to="/admin/home" className="block px-2 py-1 hover:bg-gray-50 rounded">Admin Home</Link></li>
-                        <li><Link to="/admin/liststudents" className="block px-2 py-1 hover:bg-gray-50 rounded">List Students</Link></li>
-                        <li><Link to="/admin/accounts" className="block px-2 py-1 hover:bg-gray-50 rounded">Accounts</Link></li>
-                      </>
-                    )}
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="p-1 rounded hover:bg-blue-100"
+              title={collapsed ? "Mở rộng" : "Thu gọn"}
+            >
+              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            </button>
+          </div>
 
-                    {role === "class" && (
-                      <>
-                        <li><Link to="/class" className="block px-2 py-1 hover:bg-gray-50 rounded">Class</Link></li>
-                        <li><Link to="/dashboard" className="block px-2 py-1 hover:bg-gray-50 rounded">Class Dashboard</Link></li>
-                      </>
-                    )}
+          {/* --- Navigation --- */}
+          <nav className="flex-1 p-3 space-y-1">
+            {role === "admin" && (
+              <>
+                {navItem("/admin/home", "Admin Home", Home)}
+                {navItem("/admin/liststudents", "List Students", Users)}
+                {navItem("/admin/accounts", "Accounts", ListChecks)}
+              </>
+            )}
 
-                    {role === "student" && (
-                      <li><Link to="/student" className="block px-2 py-1 hover:bg-gray-50 rounded">My Card</Link></li>
-                    )}
+            {role === "class" && (
+              <>
+                {navItem("/class/home", "Class Home", Home)}
+                {navItem("/dashboard", "Class Dashboard", ListChecks)}
+                 {navItem("/class/sentnotification", "Sent Notification", ListChecks)}
+              </>
+            )}
 
-                    <li>
-                      <button onClick={handleLogout} className="w-full text-left px-2 py-1 hover:bg-gray-50 rounded">Logout</button>
-                    </li>
-                  </ul>
-                </>
-              ) : (
-                <ul>
-                  <li><Link to="/login" className="block px-2 py-1 hover:bg-gray-50 rounded">Login</Link></li>
-                </ul>
+            {role === "student" && (
+              <>
+                {navItem("/students/home", "Thông tin", IdCard)}
+                {navItem(
+                  "/students/checkattendance",
+                  "Lịch sử điểm danh",
+                  ListChecks
+                )}
+                {navItem("/students/notification", "Thông báo", Bell)}
+              </>
+            )}
+          </nav>
+        </div>
+
+        {/* --- Bottom Section --- */}
+        <div className="border-t p-3 flex flex-col items-start">
+          {username ? (
+            <>
+              {!collapsed && (
+                <div className="mb-2">
+                  <div className="text-sm font-medium">{username}</div>
+                  <div className="text-xs text-gray-500">{role}</div>
+                </div>
               )}
-            </div>
-          </details>
+              <button
+                onClick={handleLogout}
+                title="Đăng xuất"
+                className="flex items-center gap-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm w-full"
+              >
+                <LogOut size={18} />
+                {!collapsed && <span>Logout</span>}
+              </button>
+            </>
+          ) : (
+            <Link
+              to="/login"
+              className="w-full px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-center"
+            >
+              Login
+            </Link>
+          )}
         </div>
       </div>
-    </header>
+
+      {/* =========================
+          Padding offset for main content
+      ========================== */}
+      <div
+        className="hidden md:block transition-all duration-300"
+        style={{
+          paddingLeft: collapsed ? "80px" : "256px", // khớp với w-20 và w-64
+        }}
+      ></div>
+    </>
   );
 }

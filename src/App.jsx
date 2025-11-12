@@ -1,33 +1,77 @@
+// src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState } from "react";
+
+// 🔹 Common
 import Header from "./components/Header";
-import Pending from "./pages/Pending";
-import StudentList from "./pages/StudentList";
 import Login from "./pages/Login";
 import CardDetail from "./pages/CardDetail";
+import StudentList from "./pages/StudentList";
+import Pending from "./pages/Pending";
+
+// 🔹 Admin pages
 import AdminLayout from "./pages/admin/AdminLayout";
-import AdminAccounts from "./pages/admin/AdminAccounts";
 import AdminHome from "./pages/admin/AdminHome";
+import AdminAccounts from "./pages/admin/AdminAccounts";
 import AdminListStudents from "./pages/admin/AdminListStudents";
+
+// 🔹 Class pages
+import ClassLayout from "./pages/class/ClassLayout";
 import ClassAccounts from "./pages/ClassAccounts";
+
+// 🔹 Student pages
+import StudentLayout from "./pages/students/StudentsLayout";
+import StudentHome from "./pages/students/StudentHome";
 import StudentAccounts from "./pages/StudentAccounts";
+import StudentNotification from "./pages/students/StudentNotification";
+
+// 🔹 Common route protection
 import ProtectedRoute from "./components/ProtectedRoute";
 
+/* -------- Role Redirect -------- */
+function RoleRedirect() {
+  const raw = localStorage.getItem("rfid_logged_user");
+  if (!raw) return <Navigate to="/login" replace />;
+  try {
+    const logged = JSON.parse(raw);
+    switch (logged.role) {
+      case "admin":
+        return <Navigate to="/admin/home" replace />;
+      case "class":
+        return <Navigate to="/class/home" replace />;
+      case "student":
+        return <Navigate to="/students/home" replace />;
+      default:
+        return <Navigate to="/login" replace />;
+    }
+  } catch {
+    return <Navigate to="/login" replace />;
+  }
+}
+
+/* -------- App Component -------- */
 export default function App() {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <BrowserRouter>
-      <div className="max-w-6xl mx-auto p-4">
-        <Header />
-        <main>
-          <Routes>
-            {/* Redirect root → login */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+      <Header collapsed={collapsed} setCollapsed={setCollapsed} />
 
-            {/* Public route */}
+      <main
+        className={`min-h-screen bg-gray-50 transition-all duration-300 ${
+          collapsed ? "md:pl-[80px]" : "md:pl-[256px]"
+        }`}
+      >
+        {/* ✅ vùng nội dung trung tâm có giới hạn chiều rộng, căn giữa hợp lý */}
+        <div className="content-container bg-gradient-to-br from-blue-100 to-blue-300 px-4 py-6 md:px-8 lg:px-10 xl:px-12 max-w-[1400px] mx-auto">
+          <Routes>
+            {/* ---------- ROOT ---------- */}
+            <Route path="/" element={<RoleRedirect />} />
             <Route path="/login" element={<Login />} />
 
-            {/* Admin routes with layout and nested routes */}
+            {/* ---------- ADMIN ---------- */}
             <Route
-              path="/admin"
+              path="/admin/*"
               element={
                 <ProtectedRoute roles={["admin"]}>
                   <AdminLayout />
@@ -40,46 +84,53 @@ export default function App() {
               <Route path="liststudents" element={<AdminListStudents />} />
             </Route>
 
-            {/* Class-only routes */}
+            {/* ---------- CLASS ---------- */}
             <Route
-              path="/class"
+              path="/class/*"
               element={
                 <ProtectedRoute roles={["class"]}>
-                  <ClassAccounts />
+                  <ClassLayout />
                 </ProtectedRoute>
               }
-            />
+            >
+              <Route index element={<ClassAccounts />} />
+              <Route path="home" element={<ClassAccounts />} />
+              <Route path="accounts" element={<ClassAccounts />} />
+            </Route>
 
-            {/* Student-only routes */}
+            {/* ---------- STUDENTS ---------- */}
             <Route
-              path="/student"
+              path="/students/*"
               element={
                 <ProtectedRoute roles={["student"]}>
-                  <StudentAccounts />
+                  <StudentLayout />
                 </ProtectedRoute>
               }
-            />
+            >
+              <Route index element={<StudentHome />} />
+              <Route path="home" element={<StudentHome />} />
+              <Route path="checkattendance" element={<StudentAccounts />} />
+              <Route path="notification" element={<StudentNotification />} />
+            </Route>
 
-            {/* Dashboard for admin & class */}
+            {/* ---------- DASHBOARD ---------- */}
             <Route
               path="/dashboard"
               element={
                 <ProtectedRoute roles={["admin", "class"]}>
-                  <div className="grid gap-6">
-                    <StudentList />
-                  </div>
+                  <StudentList />
                 </ProtectedRoute>
               }
             />
 
-            {/* View single card (no strict role restriction) */}
+            {/* ---------- CARD DETAIL ---------- */}
             <Route path="/card/:uid" element={<CardDetail />} />
 
-            {/* Fallback */}
+            {/* ---------- FALLBACK ---------- */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
-        </main>
-      </div>
+        </div>
+      </main>
     </BrowserRouter>
   );
 }

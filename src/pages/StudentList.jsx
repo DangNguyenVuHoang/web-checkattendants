@@ -197,10 +197,10 @@ export default function StudentList() {
                     🔎 Xem
                   </a>
                   <button
-                    onClick={() => handleDeleteStudent(uid)}
+                    // onClick={() => handleDeleteStudent(uid)}
                     className="px-3 py-2 text-sm bg-gray-100 text-black rounded-md hover:bg-red-500 transition-colors"
                   >
-                    🗑️ Xoá
+                    ✉️ Gửi thông báo
                   </button>
                 </div>
               </div>
@@ -252,10 +252,10 @@ export default function StudentList() {
                         </button>
                         <a href={`/card/${uid}`} className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-md">🔎</a>
                         <button
-                          onClick={() => handleDeleteStudent(uid)}
+                          // onClick={() => handleDeleteStudent(uid)}
                           className="px-3 py-1 bg-gray-100 text-black rounded-md hover:bg-red-500 transition-colors"
                         >
-                          🗑️
+                          📤 
                         </button>
                       </div>
                     </td>

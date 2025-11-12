@@ -34,13 +34,13 @@ export default function ModalEditStudent({ uid, onClose }) {
           Chỉnh sửa học sinh: {form.name}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
+          {/* <input
             name="name"
             value={form.name || ""}
             onChange={handleChange}
             className="border p-2 rounded w-full"
             placeholder="Tên học sinh"
-          />
+          /> */}
           <input
             name="parentName"
             value={form.parentName || ""}
@@ -48,13 +48,9 @@ export default function ModalEditStudent({ uid, onClose }) {
             className="border p-2 rounded w-full"
             placeholder="Tên phụ huynh"
           />
-          <input
-            name="class"
-            value={form.class || ""}
-            onChange={handleChange}
-            className="border p-2 rounded w-full"
-            placeholder="Lớp"
-          />
+<div className=" p-2 rounded w-full bg-gray-50 text-gray-700">
+  Lớp: {form.class || "Chưa có lớp"}
+</div>
           <input
             name="phone"
             value={form.phone || ""}

@@ -79,7 +79,7 @@ function ModalUpdate({ account, classOptions, onClose, onUpdated }) {
       <div className="relative bg-white p-6 rounded-lg shadow-lg max-w-md w-full z-10">
         <h3 className="text-lg font-bold mb-2">Cập nhật tài khoản</h3>
         <div className="space-y-3">
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium mb-1">Role</label>
             <select
               value={role}
@@ -89,7 +89,7 @@ function ModalUpdate({ account, classOptions, onClose, onUpdated }) {
               <option value="admin">Admin</option>
               <option value="class">Class</option>
             </select>
-          </div>
+          </div> */}
           {role === "class" && (
             <div>
               <label className="block text-sm font-medium mb-1">Lớp quản lý</label>
@@ -285,7 +285,7 @@ export default function AdminAccounts() {
             onChange={(e) => setRole(e.target.value)}
             className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="admin">Admin</option>
+            {/* <option value="admin">Admin</option> */}
             <option value="class">Class</option>
           </select>
           {role === "class" ? (
@@ -330,7 +330,7 @@ export default function AdminAccounts() {
           <select
             value={filterRole}
             onChange={e => setFilterRole(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
+            className="border rounded px-2 py-1 text-sm disabled:opacity-50"
           >
             <option value="">Tất cả role</option>
             <option value="admin">Admin</option>

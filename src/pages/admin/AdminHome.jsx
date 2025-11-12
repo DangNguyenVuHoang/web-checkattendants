@@ -1,50 +1,3 @@
-// // src/pages/admin/AdminHome.jsx
-// import Pending from "../../pages/Pending";
-// import { useEffect, useState } from "react";
-// import { ref, onValue } from "firebase/database";
-// import { db } from "../../firebase";
-
-// export default function AdminHome() {
-//   const [counts, setCounts] = useState({ pending: 0, students: 0, classes: 0 });
-
-//   useEffect(() => {
-//     const pRef = ref(db, "Pending");
-//     const uRef = ref(db, "USER");
-//     const cRef = ref(db, "Class");
-
-//     const unsubP = onValue(pRef, (s) => setCounts((c) => ({ ...c, pending: s.exists() ? Object.keys(s.val() || {}).length : 0 })));
-//     const unsubU = onValue(uRef, (s) => setCounts((c) => ({ ...c, students: s.exists() ? Object.keys(s.val() || {}).length : 0 })));
-//     const unsubC = onValue(cRef, (s) => setCounts((c) => ({ ...c, classes: s.exists() ? Object.keys(s.val() || {}).length : 0 })));
-
-//     return () => { unsubP(); unsubU(); unsubC(); };
-//   }, []);
-
-//   return (
-//     <div className="space-y-6">
-//       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-//         <div className="p-4 bg-white rounded-lg shadow">
-//           <div className="text-sm text-gray-500">Pending</div>
-//           <div className="text-2xl font-bold">{counts.pending}</div>
-//         </div>
-//         <div className="p-4 bg-white rounded-lg shadow">
-//           <div className="text-sm text-gray-500">Students</div>
-//           <div className="text-2xl font-bold">{counts.students}</div>
-//         </div>
-//         <div className="p-4 bg-white rounded-lg shadow">
-//           <div className="text-sm text-gray-500">Classes</div>
-//           <div className="text-2xl font-bold">{counts.classes}</div>
-//         </div>
-//       </div>
-
-//       <div className="bg-white p-4 rounded-lg shadow">
-//         <h4 className="font-semibold mb-2">Recent Pending</h4>
-//         {/* reuse Pending component but it may show full UI; if Pending is heavy you can create a lightweight summary */}
-//         <Pending adminMode={true} maxItems={6} />
-//       </div>
-//     </div>
-//   );
-// }
-// src/pages/AdminAccounts.jsx
 import { useEffect, useState } from "react";
 import { ref, set, get, onValue, remove } from "firebase/database"; // thêm remove
 import { db } from "../../firebase";
@@ -246,7 +199,7 @@ export default function AdminAccounts() {
             onChange={(e) => setRole(e.target.value)}
             className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="admin">Admin</option>
+            {/* <option value="admin">Admin</option> */}
             <option value="class">Class</option>
           </select>
 

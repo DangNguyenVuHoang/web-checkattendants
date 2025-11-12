@@ -69,7 +69,7 @@ export default function ClassAccounts() {
   }, [search, filterGender, filterClass, Object.keys(students).length]);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8">
+    <div >
       <h2 className="text-xl md:text-2xl font-semibold mb-4 text-blue-700">Trang lớp: {className}</h2>
 
       {/* Bộ lọc + search */}
@@ -106,7 +106,7 @@ export default function ClassAccounts() {
       </div>
 
       {/* Responsive table/cards */}
-      <div className="bg-white p-2 sm:p-4 rounded-xl shadow">
+      <div>
         {/* Mobile: cards */}
         <div className="block md:hidden">
           {paged.length === 0 ? (
