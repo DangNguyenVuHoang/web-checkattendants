@@ -354,7 +354,7 @@ const handleDeleteAccount = async (username) => {
               {loadingCreate ? "Đang tạo..." : "Tạo tài khoản"}
             </button>
             <p className="text-sm text-gray-500 self-center">
-              *Mật khẩu mặc định = username. Nên đổi khi triển khai thật.
+              *Mật khẩu mặc định = username.
             </p>
           </div>
         </div>
