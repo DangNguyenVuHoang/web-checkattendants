@@ -29,38 +29,51 @@ export default function ModalEditStudent({ uid, onClose }) {
   const handleChange = (e) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  const handleSave = async () => {
-    try {
-      const oldClass = form.class || null;
-      const newClass = form.newClass || oldClass;
+const handleSave = async () => {
+  try {
+    const oldClass = form.class || null;
+    const newClass = form.newClass || oldClass;
 
-      const updates = {};
+    const updates = {};
 
-      // 1. Update USER main info
-      updates[`USER/${uid}/parentName`] = form.parentName || "";
-      updates[`USER/${uid}/phone`] = form.phone || "";
-      updates[`USER/${uid}/parentPhone`] = form.parentPhone || "";
-      updates[`USER/${uid}/class`] = newClass || null;
+    // 1. Update USER main info
+    updates[`USER/${uid}/parentName`] = form.parentName || "";
+    updates[`USER/${uid}/phone`] = form.phone || "";
+    updates[`USER/${uid}/parentPhone`] = form.parentPhone || "";
+    updates[`USER/${uid}/class`] = newClass || null;
 
-      // 2. Xóa khỏi lớp cũ nếu đổi lớp
-      if (oldClass && oldClass !== newClass) {
-        updates[`Class/${oldClass}/students/${uid}`] = null;
-      }
+    // 2. Nếu đổi lớp
+    if (oldClass && oldClass !== newClass) {
+      // 2.1 Lấy dữ liệu cũ trong classOld/students/uid
+      const oldClassDataSnap = await get(ref(db, `Class/${oldClass}/students/${uid}`));
+      const oldClassData = oldClassDataSnap.val() || {
+        movedAt: new Date().toISOString(),
+      };
 
-      // 3. Thêm vào lớp mới
-      if (newClass) {
-        updates[`Class/${newClass}/students/${uid}`] = true;
-      }
+      // 2.2 Xóa khỏi lớp cũ
+      updates[`Class/${oldClass}/students/${uid}`] = null;
 
-      await update(ref(db), updates);
-
-      toast.success("Đã cập nhật thông tin & lớp học cho học sinh");
-      onClose();
-    } catch (err) {
-      console.error(err);
-      toast.error("Lỗi lưu thông tin");
+      // 2.3 Ghi đầy đủ Data cũ sang lớp mới
+      updates[`Class/${newClass}/students/${uid}`] = oldClassData;
     }
-  };
+
+    // Nếu không đổi lớp → không đụng tới node Class
+    if (!oldClass && newClass) {
+      updates[`Class/${newClass}/students/${uid}`] = {
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    await update(ref(db), updates);
+
+    toast.success("Đã cập nhật thông tin & giữ nguyên dữ liệu lớp cũ");
+    onClose();
+  } catch (err) {
+    console.error(err);
+    toast.error("Lỗi lưu thông tin");
+  }
+};
+
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">

@@ -56,7 +56,7 @@ export default function ModalSendNotification({ studentUID, classManaged, onClos
         >
           <option value="sleepy">Buồn ngủ / Ngủ gật</option>
           <option value="health">Sức khoẻ không tốt</option>
-          <option value="focus">Thiếu tập trung</option>
+          {/* <option value="focus">Thiếu tập trung</option> */}
           <option value="custom">Tuỳ chỉnh</option>
         </select>
 

@@ -12,7 +12,7 @@ function ModalDetail({ account, onClose }) {
 
   useEffect(() => {
     if (account?.uid) {
-      get(ref(db, `USER/${account.uid}`)).then(snap => {
+      get(ref(db, `USER/${account.uid}`)).then((snap) => {
         setStudentName(snap.val()?.name || "");
       });
     } else {
@@ -27,11 +27,24 @@ function ModalDetail({ account, onClose }) {
       <div className="relative bg-white p-6 rounded-lg shadow-lg max-w-md w-full z-10">
         <h3 className="text-lg font-bold mb-2">Chi tiết tài khoản</h3>
         <div className="space-y-2 text-sm">
-          <div><b>Username:</b> {account.username}</div>
-          <div><b>Role:</b> {account.role}</div>
-          <div><b>Lớp quản lý:</b> {account.classManaged || "-"}</div>
-          <div><b>Tên học sinh:</b> {studentName || "-"}</div>
-          <div><b>Ngày tạo:</b> {account.createdAt ? new Date(account.createdAt).toLocaleString() : "-"}</div>
+          <div>
+            <b>Username:</b> {account.username}
+          </div>
+          <div>
+            <b>Role:</b> {account.role}
+          </div>
+          <div>
+            <b>Lớp quản lý:</b> {account.classManaged || "-"}
+          </div>
+          <div>
+            <b>Tên học sinh:</b> {studentName || "-"}
+          </div>
+          <div>
+            <b>Ngày tạo:</b>{" "}
+            {account.createdAt
+              ? new Date(account.createdAt).toLocaleString()
+              : "-"}
+          </div>
         </div>
         <button
           onClick={onClose}
@@ -92,25 +105,31 @@ function ModalUpdate({ account, classOptions, onClose, onUpdated }) {
           </div> */}
           {role === "class" && (
             <div>
-              <label className="block text-sm font-medium mb-1">Lớp quản lý</label>
+              <label className="block text-sm font-medium mb-1">
+                Lớp quản lý
+              </label>
               <select
                 value={classManaged}
-                onChange={e => setClassManaged(e.target.value)}
+                onChange={(e) => setClassManaged(e.target.value)}
                 className="border rounded px-2 py-1 w-full"
               >
                 <option value="">-- Chọn lớp --</option>
-                {classOptions.map(c => (
-                  <option key={c} value={c}>{c}</option>
+                {classOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium mb-1">Mật khẩu mới</label>
+            <label className="block text-sm font-medium mb-1">
+              Mật khẩu mới
+            </label>
             <input
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               className="border rounded px-2 py-1 w-full"
               placeholder="Để trống nếu không đổi"
             />
@@ -242,70 +261,96 @@ export default function AdminAccounts() {
     }
   };
 
-// Xoá account + toàn bộ dữ liệu liên quan
-const handleDeleteAccount = async (username) => {
-  if (!window.confirm("Bạn có chắc muốn xoá tài khoản này và toàn bộ dữ liệu liên quan?")) {
-    return;
-  }
-
-  try {
-    const accRef = ref(db, `ACCOUNTS/${username}`);
-    const snap = await get(accRef);
-
-    if (!snap.exists()) {
-      toast.error("Account không tồn tại");
+  // Xoá account + toàn bộ dữ liệu liên quan
+  const handleDeleteAccount = async (username) => {
+    if (
+      !window.confirm(
+        "Bạn có chắc muốn xoá tài khoản này và toàn bộ dữ liệu liên quan?"
+      )
+    ) {
       return;
     }
 
-    const acc = snap.val();
-    const uid = acc.uid || null;
-    const classManaged = acc.classManaged || null;
+    try {
+      const accRef = ref(db, `ACCOUNTS/${username}`);
+      const snap = await get(accRef);
 
-    // --- Batch updates ---
-    const updates = {};
+      if (!snap.exists()) {
+        toast.error("Account không tồn tại");
+        return;
+      }
 
-    // 1. Xoá ACCOUNTS
-    updates[`ACCOUNTS/${username}`] = null;
+      const acc = snap.val();
+      const uid = acc.uid || null;
+      const classManaged = acc.classManaged || null;
 
-    // 2. Xoá USER/{uid}
-    if (uid) {
-      updates[`USER/${uid}`] = null;
+      // --- Batch updates ---
+      const updates = {};
+
+      // 1. Xoá ACCOUNTS
+      updates[`ACCOUNTS/${username}`] = null;
+
+      // 2. Xoá USER/{uid}
+      if (uid) {
+        updates[`USER/${uid}`] = null;
+      }
+
+      // 3. Xoá RFID/{uid}
+      if (uid) {
+        updates[`RFID/${uid}`] = null;
+      }
+
+      // 4. Nếu tài khoản này là class admin → xoá liên kết ở Class
+      if (classManaged) {
+        updates[`Class/${classManaged}/classAccount`] = null;
+      }
+
+      // 5. Nếu USER/{uid} nằm trong danh sách lớp nào đó thì xoá luôn reference trong students
+      if (uid && classManaged) {
+        updates[`Class/${classManaged}/students/${uid}`] = null;
+      }
+
+      await update(ref(db), updates);
+
+      toast.success("Đã xoá toàn bộ dữ liệu liên quan đến account!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi xoá account");
     }
+  };
+  // Hàm parse ngày tháng định dạng VN (dd-mm-yyyy hh:mm:ss) hoặc ISO
+  function parseVNDate(d) {
+    if (!d) return null;
+    // Nếu là ISO chuẩn -> parse được luôn
+    if (!isNaN(Date.parse(d))) return new Date(d);
 
-    // 3. Xoá RFID/{uid}
-    if (uid) {
-      updates[`RFID/${uid}`] = null;
+    try {
+      const [datePart, timePart] = d.split(" ");
+      const [day, month, year] = datePart.split("-").map(Number);
+      const [hh = 0, mm = 0, ss = 0] = (timePart || "").split(":").map(Number);
+      return new Date(year, month - 1, day, hh, mm, ss);
+    } catch (e) {
+      return null;
     }
-
-    // 4. Nếu tài khoản này là class admin → xoá liên kết ở Class
-    if (classManaged) {
-      updates[`Class/${classManaged}/classAccount`] = null;
-    }
-
-    // 5. Nếu USER/{uid} nằm trong danh sách lớp nào đó thì xoá luôn reference trong students
-    if (uid && classManaged) {
-      updates[`Class/${classManaged}/students/${uid}`] = null;
-    }
-
-    await update(ref(db), updates);
-
-    toast.success("Đã xoá toàn bộ dữ liệu liên quan đến account!");
-
-  } catch (err) {
-    console.error(err);
-    toast.error("Lỗi xoá account");
   }
-};
-
 
   // Phân trang + lọc
   const filteredAccounts = accountsArr
-    .filter(acc => !search || acc.username.toLowerCase().includes(search.toLowerCase()))
-    .filter(acc => !filterRole || acc.role === filterRole)
-    .filter(acc => !filterClass || acc.classManaged === filterClass);
+    .filter(
+      (acc) =>
+        !search || acc.username.toLowerCase().includes(search.toLowerCase())
+    )
+    .filter((acc) => !filterRole || acc.role === filterRole)
+    .filter((acc) => !filterClass || acc.classManaged === filterClass);
 
-  const accountsTotalPages = Math.max(1, Math.ceil(filteredAccounts.length / PAGE_SIZE));
-  const accountsPageItems = filteredAccounts.slice((accountsPage - 1) * PAGE_SIZE, accountsPage * PAGE_SIZE);
+  const accountsTotalPages = Math.max(
+    1,
+    Math.ceil(filteredAccounts.length / PAGE_SIZE)
+  );
+  const accountsPageItems = filteredAccounts.slice(
+    (accountsPage - 1) * PAGE_SIZE,
+    accountsPage * PAGE_SIZE
+  );
 
   useEffect(() => {
     setAccountsPage(1);
@@ -315,7 +360,9 @@ const handleDeleteAccount = async (username) => {
     <div className="space-y-8">
       {/* --- Tạo tài khoản --- */}
       <section className="bg-white p-6 rounded-2xl shadow-md border">
-        <h3 className="text-xl font-semibold mb-6 text-gray-800">⚙️ Tạo tài khoản Admin / Class</h3>
+        <h3 className="text-xl font-semibold mb-6 text-gray-800">
+          ⚙️ Tạo tài khoản Admin / Class
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input
             placeholder="Nhập username"
@@ -339,7 +386,9 @@ const handleDeleteAccount = async (username) => {
             >
               <option value="">-- Chọn hoặc nhập lớp --</option>
               {classOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
           ) : (
@@ -367,12 +416,12 @@ const handleDeleteAccount = async (username) => {
             type="text"
             placeholder="Tìm theo username..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             className="border rounded px-2 py-1 text-sm"
           />
           <select
             value={filterRole}
-            onChange={e => setFilterRole(e.target.value)}
+            onChange={(e) => setFilterRole(e.target.value)}
             className="border rounded px-2 py-1 text-sm disabled:opacity-50"
           >
             <option value="">Tất cả role</option>
@@ -382,12 +431,14 @@ const handleDeleteAccount = async (username) => {
           </select>
           <select
             value={filterClass}
-            onChange={e => setFilterClass(e.target.value)}
+            onChange={(e) => setFilterClass(e.target.value)}
             className="border rounded px-2 py-1 text-sm"
           >
             <option value="">Tất cả lớp</option>
-            {classOptions.map(cls => (
-              <option key={cls} value={cls}>{cls}</option>
+            {classOptions.map((cls) => (
+              <option key={cls} value={cls}>
+                {cls}
+              </option>
             ))}
           </select>
         </div>
@@ -396,9 +447,12 @@ const handleDeleteAccount = async (username) => {
       {/* --- Danh sách tất cả account --- */}
       <section className="bg-white p-6 rounded-2xl shadow-md border">
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-semibold text-gray-800">👤 Danh sách tất cả tài khoản</h4>
+          <h4 className="text-lg font-semibold text-gray-800">
+            👤 Danh sách tất cả tài khoản
+          </h4>
           <div className="text-sm text-gray-600">
-            Tổng: {filteredAccounts.length} | Trang {accountsPage} / {accountsTotalPages}
+            Tổng: {filteredAccounts.length} | Trang {accountsPage} /{" "}
+            {accountsTotalPages}
           </div>
         </div>
         {filteredAccounts.length === 0 ? (
@@ -418,11 +472,19 @@ const handleDeleteAccount = async (username) => {
                 </thead>
                 <tbody>
                   {accountsPageItems.map((acc) => (
-                    <tr key={acc.username} className="border-t hover:bg-gray-50">
+                    <tr
+                      key={acc.username}
+                      className="border-t hover:bg-gray-50"
+                    >
                       <td className="p-2">{acc.username}</td>
                       <td className="p-2">{acc.role}</td>
                       <td className="p-2">{acc.classManaged || "-"}</td>
-                      <td className="p-2">{acc.createdAt ? new Date(acc.createdAt).toLocaleString() : "-"}</td>
+                      <td className="p-2">
+                        {acc.createdAt
+                          ? parseVNDate(acc.createdAt)?.toLocaleString()
+                          : "-"}
+                      </td>
+
                       <td className="p-2 flex gap-2">
                         <button
                           onClick={() => setDetailAcc(acc)}
@@ -459,7 +521,9 @@ const handleDeleteAccount = async (username) => {
                   Previous
                 </button>
                 <button
-                  onClick={() => setAccountsPage((s) => Math.min(accountsTotalPages, s + 1))}
+                  onClick={() =>
+                    setAccountsPage((s) => Math.min(accountsTotalPages, s + 1))
+                  }
                   disabled={accountsPage >= accountsTotalPages}
                   className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
                 >

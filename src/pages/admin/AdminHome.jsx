@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ref, set, get, onValue, remove } from "firebase/database"; // thêm remove
+import { ref, set, get, onValue, remove, update } from "firebase/database";
 import { db } from "../../firebase";
 import bcrypt from "bcryptjs";
 import toast from "react-hot-toast";
@@ -155,18 +155,41 @@ export default function AdminAccounts() {
     }
   };
 
-  // Xử lý xoá học sinh
-  const handleDeleteStudent = async (uid) => {
-    if (window.confirm("Bạn có chắc muốn xoá học sinh này?")) {
-      try {
-        await remove(ref(db, `USER/${uid}`));
-        toast.success("Đã xoá học sinh");
-      } catch (err) {
-        console.error(err);
-        toast.error("Lỗi xoá học sinh");
-      }
+// Xử lý xoá học sinh + toàn bộ dữ liệu liên quan
+const handleDeleteStudent = async (uid) => {
+  if (!window.confirm("Bạn có chắc muốn xoá toàn bộ dữ liệu của học sinh này?")) {
+    return;
+  }
+
+  try {
+    // 1️⃣ Lấy class của học sinh trước khi xoá
+    const snap = await get(ref(db, `USER/${uid}`));
+    const userData = snap.val();
+
+    const className = userData?.class || null;
+
+    // 2️⃣ Tạo object xoá
+    const updates = {};
+
+    updates[`USER/${uid}`] = null;                 // Xoá hồ sơ User
+    updates[`RFID/${uid}`] = null;                 // Xoá dữ liệu RFID
+    updates[`Notifications/${uid}`] = null;        // Xoá thông báo
+    updates[`Pending/${uid}`] = null;              // Xoá pending nếu có
+
+    if (className) {
+      updates[`Class/${className}/students/${uid}`] = null; // Xoá khỏi class
     }
-  };
+
+    // 3️⃣ Thực hiện xoá một lần
+    await update(ref(db), updates);
+
+    toast.success("Đã xoá toàn bộ dữ liệu của học sinh.");
+  } catch (err) {
+    console.error(err);
+    toast.error("Lỗi xoá dữ liệu học sinh.");
+  }
+};
+
 
   // pagination helpers
   const pendingTotalPages = Math.max(1, Math.ceil(pendingArr.length / PAGE_SIZE));
