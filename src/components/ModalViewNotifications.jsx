@@ -21,7 +21,6 @@ export default function ModalViewNotifications({ studentUID, onClose }) {
         ...val[id],
       }));
 
-      // sort newest first
       arr.sort((a, b) => new Date(b.time) - new Date(a.time));
 
       setNotifications(arr);
@@ -57,16 +56,17 @@ export default function ModalViewNotifications({ studentUID, onClose }) {
       {/* Overlay */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
-      <div className="relative bg-white w-full max-w-lg p-6 rounded shadow-lg z-10">
+      <div className="relative bg-white w-full max-w-lg p-6 rounded shadow-lg z-10 max-h-[90vh] flex flex-col">
         <h2 className="text-xl font-semibold mb-4">Lịch sử thông báo</h2>
 
-        {notifications.length === 0 ? (
-          <div className="text-gray-500 text-center py-6">
-            Chưa có thông báo nào
-          </div>
-        ) : (
-          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-            {notifications.map((n) => (
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+          {notifications.length === 0 ? (
+            <div className="text-gray-500 text-center py-6">
+              Chưa có thông báo nào
+            </div>
+          ) : (
+            notifications.map((n) => (
               <div
                 key={n.id}
                 className={`border p-3 rounded ${
@@ -106,11 +106,12 @@ export default function ModalViewNotifications({ studentUID, onClose }) {
                   </button>
                 )}
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
 
-        <div className="flex justify-end mt-4">
+        {/* Footer */}
+        <div className="flex justify-end pt-4 border-t mt-4">
           <button
             className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
             onClick={onClose}

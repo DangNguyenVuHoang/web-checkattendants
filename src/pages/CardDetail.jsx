@@ -4,11 +4,8 @@ import { ref, get, onValue } from "firebase/database";
 import { db } from "../firebase";
 import { useParams, useNavigate } from "react-router-dom";
 
-/**
- * CardDetail
- * - Cho phép admin / class / student xem chi tiết 1 UID thẻ RFID
- * - Hiển thị thông tin học sinh, trạng thái thẻ, lịch sử quẹt
- */
+const PAGE_SIZE = 12; // 🔹 số log mỗi trang
+
 export default function CardDetail() {
   const { uid } = useParams();
   const navigate = useNavigate();
@@ -18,6 +15,11 @@ export default function CardDetail() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [page, setPage] = useState(1); // 🔹 trạng thái phân trang
+
+  /* ---------------------------------------------------
+     LOAD DATA
+  --------------------------------------------------- */
   useEffect(() => {
     const loggedRaw = localStorage.getItem("rfid_logged_user");
     if (!loggedRaw) {
@@ -27,7 +29,7 @@ export default function CardDetail() {
 
     const logged = JSON.parse(loggedRaw);
 
-    // 🔹 Load thông tin học sinh
+    // Load USER
     get(ref(db, `USER/${uid}`))
       .then((snap) => {
         if (!snap.exists()) {
@@ -37,11 +39,11 @@ export default function CardDetail() {
         }
 
         const data = snap.val();
+
         const isAdmin = logged.role === "admin";
         const isClass =
           logged.role === "class" &&
-          String(data.class || "").toLowerCase() ===
-            String(logged.classManaged || "").toLowerCase();
+          String(data.class).toLowerCase() === String(logged.classManaged).toLowerCase();
         const isOwner = logged.role === "student" && logged.uid === uid;
 
         if (!(isAdmin || isClass || isOwner)) {
@@ -51,15 +53,10 @@ export default function CardDetail() {
         }
 
         setUser(data);
-        setLoading(false);
       })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-        setUser(null);
-      });
+      .finally(() => setLoading(false));
 
-    // 🔹 Load dữ liệu RFID realtime
+    // Load RFID realtime
     const rfidRef = ref(db, `RFID/${uid}`);
     const unsub = onValue(rfidRef, (snap) => {
       if (!snap.exists()) {
@@ -75,34 +72,51 @@ export default function CardDetail() {
       });
 
       const logs = data.accessLog || data.accessLogs || {};
-      const arr = Object.values(logs)
-        .map((item) => ({
-          time: item.time ?? "-",
-          status: item.status ?? item.state ?? JSON.stringify(item),
-        }))
-        .sort(
-          (a, b) =>
-            new Date(b.time).getTime() - new Date(a.time).getTime()
-        );
+      let arr = Object.values(logs).map((item) => ({
+        time: item.time ?? "-",
+        status: item.status ?? item.state ?? JSON.stringify(item),
+      }));
 
-      setHistory(arr.slice(0, 20));
+      arr.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+      setHistory(arr);
+      setPage(1); // reset về trang đầu khi dữ liệu reload
     });
 
     return () => unsub();
   }, [uid, navigate]);
 
-  /* ================== UI Helpers ================== */
+  /* ---------------------------------------------------
+     PAGINATION
+  --------------------------------------------------- */
+  const totalPages =
+    history.length === 0 ? 1 : Math.ceil(history.length / PAGE_SIZE);
+
+  const currentPageItems = history.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages, page]);
+
+  /* ---------------------------------------------------
+     UI HELPERS
+  --------------------------------------------------- */
   const statusColor = (s) => {
     if (!s) return "bg-gray-200 text-gray-700";
-    const st = String(s).toLowerCase();
-    if (st.includes("lên") || st.includes("len") || st.includes("in"))
+    const t = s.toLowerCase();
+    if (t.includes("in") || t.includes("lên") || t.includes("len"))
       return "bg-green-100 text-green-800";
-    if (st.includes("xuống") || st.includes("xuong") || st.includes("out"))
+    if (t.includes("out") || t.includes("xuống") || t.includes("xuong"))
       return "bg-red-100 text-red-800";
     return "bg-yellow-100 text-yellow-800";
   };
 
-  /* ================== UI Render ================== */
+  /* ---------------------------------------------------
+     RENDER
+  --------------------------------------------------- */
   if (loading)
     return <div className="p-8 text-center text-gray-600">Đang tải dữ liệu...</div>;
 
@@ -110,11 +124,11 @@ export default function CardDetail() {
     return (
       <div className="p-8 text-center">
         <div className="text-red-600 font-semibold mb-3">
-          ⛔ Bạn không có quyền xem thẻ này hoặc thẻ không tồn tại.
+          ⛔ Không có quyền xem thẻ này hoặc dữ liệu không tồn tại.
         </div>
         <button
           onClick={() => navigate("/login")}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+          className="px-4 py-2 bg-blue-600 text-white rounded"
         >
           Đăng nhập
         </button>
@@ -122,117 +136,109 @@ export default function CardDetail() {
     );
 
   return (
-    <div >
-      {/* ===== Header ===== */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <div>
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-blue-700">
-            Chi tiết thẻ RFID:{" "}
-            <span className="font-mono text-gray-800">{uid}</span>
+            Chi tiết thẻ RFID: <span className="font-mono">{uid}</span>
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Thông tin học sinh và lịch sử quẹt thẻ gần đây
+            Thông tin học sinh & lịch sử quẹt thẻ đầy đủ
           </p>
         </div>
-
-        {/* <div className="flex gap-2 mt-3 md:mt-0">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-gray-100 hover:bg-blue-100 rounded-md text-sm"
-          >
-            ← Quay lại
-          </button>
-          <button
-            onClick={() => {
-              localStorage.removeItem("rfid_logged_user");
-              navigate("/login");
-            }}
-            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm"
-          >
-            Đăng xuất
-          </button>
-        </div> */}
       </div>
 
-      {/* ===== Info Grid ===== */}
+      {/* GRID INFO */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Thông tin học sinh */}
         <div className="bg-gray-50 rounded-lg p-4 shadow-sm">
-          <h3 className="font-semibold text-lg mb-3 text-blue-700">
+          <h3 className="font-semibold text-lg text-blue-700 mb-3">
             🧍‍♂️ Thông tin học sinh
           </h3>
+
           <div className="space-y-2 text-sm text-gray-700">
             <div><strong>Họ tên:</strong> {user.name}</div>
             <div><strong>Giới tính:</strong> {user.gender || "-"}</div>
             <div><strong>Ngày sinh:</strong> {user.dob || "-"}</div>
             <div><strong>Lớp:</strong> {user.class || "-"}</div>
             <div><strong>Địa chỉ:</strong> {user.address || "-"}</div>
-            <div><strong>SĐT học sinh:</strong> {user.phone || "-"}</div>
+            <div><strong>SĐT:</strong> {user.phone || "-"}</div>
             <div><strong>Phụ huynh:</strong> {user.parentName || "-"}</div>
             <div><strong>SĐT phụ huynh:</strong> {user.parentPhone || "-"}</div>
           </div>
         </div>
 
-        {/* Trạng thái RFID */}
+        {/* RFID status */}
         <div className="bg-gray-50 rounded-lg p-4 shadow-sm">
-          <h3 className="font-semibold text-lg mb-3 text-blue-700">
+          <h3 className="font-semibold text-lg text-blue-700 mb-3">
             💳 Trạng thái RFID
           </h3>
           <div className="space-y-2 text-sm text-gray-700">
             <div>
-              <span className="font-medium">Trạng thái hiện tại:</span>{" "}
-              <span
-                className={`inline-block px-3 py-1 rounded-md text-xs font-medium ${statusColor(
-                  rfid?.lastStatus
-                )}`}
-              >
+              <strong>Trạng thái hiện tại:</strong>{" "}
+              <span className={`px-3 py-1 rounded ${statusColor(rfid?.lastStatus)}`}>
                 {rfid?.lastStatus ?? "Không có"}
               </span>
             </div>
-            <div>
-              <span className="font-medium">Ngày tạo thẻ:</span>{" "}
-              {rfid?.createdAt ?? "-"}
-            </div>
-            <div>
-              <span className="font-medium">Tổng lượt quẹt:</span>{" "}
-              {history.length}
-            </div>
+            <div><strong>Ngày tạo:</strong> {rfid?.createdAt}</div>
+            <div><strong>Tổng lượt quẹt:</strong> {history.length}</div>
           </div>
         </div>
       </div>
 
-      {/* ===== Lịch sử quẹt ===== */}
+      {/* HISTORY */}
       <div className="mt-10">
         <h3 className="font-semibold text-lg mb-4 text-blue-700">
-          🕒 Lịch sử quẹt thẻ (20 lần gần nhất)
+          🕒 Lịch sử quẹt thẻ
         </h3>
 
         {history.length === 0 ? (
-          <div className="text-sm text-gray-500 italic">Không có lịch sử quẹt thẻ.</div>
+          <div className="text-gray-500 italic">Không có lịch sử quẹt thẻ.</div>
         ) : (
-          <div className="overflow-x-auto border rounded-lg">
-            <table className="min-w-full text-sm border-collapse">
-              <thead className="bg-blue-100 text-gray-700">
-                <tr>
-                  <th className="p-2 text-left font-medium">Thời gian</th>
-                  <th className="p-2 text-left font-medium">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((h, idx) => (
-                  <tr
-                    key={idx}
-                    className={`border-t ${
-                      idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                    } hover:bg-blue-50`}
-                  >
-                    <td className="p-2">{h.time}</td>
-                    <td className="p-2">{h.status}</td>
+          <>
+            <div className="overflow-x-auto border rounded-lg">
+              <table className="min-w-full text-sm">
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="p-2 text-left">Thời gian</th>
+                    <th className="p-2 text-left">Trạng thái</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {currentPageItems.map((h, idx) => (
+                    <tr key={idx} className="border-t hover:bg-blue-50">
+                      <td className="p-2">{h.time}</td>
+                      <td className="p-2">{h.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex justify-between items-center mt-3">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+              >
+                Previous
+              </button>
+
+              <span className="text-sm text-gray-600">
+                Trang {page} / {totalPages}
+              </span>
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
