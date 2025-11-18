@@ -189,30 +189,31 @@ export default function ClassAccounts() {
         </div>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-          <div className="text-sm text-gray-600">
-            Trang {page} / {totalPages}
-          </div>
-        </div>
-      )}
+{/* Pagination */}
+<div className="mt-4 flex items-center justify-between">
+  <div className="flex gap-2">
+    <button
+      onClick={() => setPage((p) => Math.max(1, p - 1))}
+      disabled={page <= 1}
+      className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
+    >
+      Previous
+    </button>
+
+    <button
+      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+      disabled={page >= totalPages}
+      className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
+    >
+      Next
+    </button>
+  </div>
+
+  <div className="text-sm text-gray-600">
+    Trang {page}/{totalPages}
+  </div>
+</div>
+
     </div>
   );
 }

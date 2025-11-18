@@ -80,11 +80,8 @@ export default function AdminAccounts() {
         return tb - ta; // Mới nhất lên đầu
       });
       setPendingArr(arr);
-      // reset page if out of range
-      setPendingPage((cur) => {
-        const max = Math.max(1, Math.ceil(arr.length / PAGE_SIZE));
-        return cur > max ? max : cur;
-      });
+      // reset to first page when data changes (Firebase updates asynchronously)
+      setPendingPage(1);
     });
     return () => unsub();
   }, []);
@@ -102,10 +99,8 @@ export default function AdminAccounts() {
         return cb - ca; // Mới nhất lên đầu
       });
       setStudentsArr(arr);
-      setStudentsPage((cur) => {
-        const max = Math.max(1, Math.ceil(arr.length / PAGE_SIZE));
-        return cur > max ? max : cur;
-      });
+      // reset to first page when user list changes
+      setStudentsPage(1);
     });
     return () => unsub();
   }, []);

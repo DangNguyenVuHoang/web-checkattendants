@@ -242,18 +242,61 @@ export default function AdminAccounts() {
     }
   };
 
-  // Xoá account
-  const handleDeleteAccount = async (username) => {
-    if (window.confirm("Bạn có chắc muốn xoá account này?")) {
-      try {
-        await remove(ref(db, `ACCOUNTS/${username}`));
-        toast.success("Đã xoá account");
-      } catch (err) {
-        console.error(err);
-        toast.error("Lỗi xoá account");
-      }
+// Xoá account + toàn bộ dữ liệu liên quan
+const handleDeleteAccount = async (username) => {
+  if (!window.confirm("Bạn có chắc muốn xoá tài khoản này và toàn bộ dữ liệu liên quan?")) {
+    return;
+  }
+
+  try {
+    const accRef = ref(db, `ACCOUNTS/${username}`);
+    const snap = await get(accRef);
+
+    if (!snap.exists()) {
+      toast.error("Account không tồn tại");
+      return;
     }
-  };
+
+    const acc = snap.val();
+    const uid = acc.uid || null;
+    const classManaged = acc.classManaged || null;
+
+    // --- Batch updates ---
+    const updates = {};
+
+    // 1. Xoá ACCOUNTS
+    updates[`ACCOUNTS/${username}`] = null;
+
+    // 2. Xoá USER/{uid}
+    if (uid) {
+      updates[`USER/${uid}`] = null;
+    }
+
+    // 3. Xoá RFID/{uid}
+    if (uid) {
+      updates[`RFID/${uid}`] = null;
+    }
+
+    // 4. Nếu tài khoản này là class admin → xoá liên kết ở Class
+    if (classManaged) {
+      updates[`Class/${classManaged}/classAccount`] = null;
+    }
+
+    // 5. Nếu USER/{uid} nằm trong danh sách lớp nào đó thì xoá luôn reference trong students
+    if (uid && classManaged) {
+      updates[`Class/${classManaged}/students/${uid}`] = null;
+    }
+
+    await update(ref(db), updates);
+
+    toast.success("Đã xoá toàn bộ dữ liệu liên quan đến account!");
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Lỗi xoá account");
+  }
+};
+
 
   // Phân trang + lọc
   const filteredAccounts = accountsArr

@@ -6,7 +6,6 @@ import { useState } from "react";
 import Header from "./components/Header";
 import Login from "./pages/Login";
 import CardDetail from "./pages/CardDetail";
-import StudentList from "./pages/StudentList";
 import Pending from "./pages/Pending";
 
 // 🔹 Admin pages
@@ -18,6 +17,7 @@ import AdminListStudents from "./pages/admin/AdminListStudents";
 // 🔹 Class pages
 import ClassLayout from "./pages/class/ClassLayout";
 import ClassAccounts from "./pages/ClassAccounts";
+import ClassStudentList from "./pages/class/ClassStudentList";
 
 // 🔹 Student pages
 import StudentLayout from "./pages/students/StudentsLayout";
@@ -28,10 +28,11 @@ import StudentNotification from "./pages/students/StudentNotification";
 // 🔹 Common route protection
 import ProtectedRoute from "./components/ProtectedRoute";
 
-/* -------- Role Redirect -------- */
+/* ---------------- ROLE REDIRECT ---------------- */
 function RoleRedirect() {
   const raw = localStorage.getItem("rfid_logged_user");
   if (!raw) return <Navigate to="/login" replace />;
+
   try {
     const logged = JSON.parse(raw);
     switch (logged.role) {
@@ -49,21 +50,38 @@ function RoleRedirect() {
   }
 }
 
-/* -------- App Component -------- */
+/* ---------------- APP COMPONENT ---------------- */
 export default function App() {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <BrowserRouter>
+
+      {/* HEADER (sidebar + topbar) */}
       <Header collapsed={collapsed} setCollapsed={setCollapsed} />
 
+      {/* MAIN CONTENT WITH FIXED BACKGROUND */}
       <main
-        className={`min-h-screen bg-gray-50 transition-all duration-300 ${
-          collapsed ? "md:pl-[80px]" : "md:pl-[256px]"
-        }`}
+        className={`
+          min-h-screen 
+          w-full
+          transition-all duration-300
+          flex  
+          ${collapsed ? "md:pl-[80px]" : "md:pl-[256px]"}
+          bg-gradient-to-br from-blue-200 via-blue-100 to-blue-300
+          bg-fixed
+        `}
       >
-        {/* ✅ vùng nội dung trung tâm có giới hạn chiều rộng, căn giữa hợp lý */}
-        <div className="content-container bg-gradient-to-br from-blue-100 to-blue-300 px-4 py-6 md:px-8 lg:px-10 xl:px-12 max-w-[1400px] mx-auto">
+        {/* CONTENT WRAPPER */}
+        <div
+          className="
+            flex-1
+            px-4 py-6 md:px-8 lg:px-10 xl:px-12
+            max-w-[1500px]
+            mx-auto
+            w-full
+          "
+        >
           <Routes>
             {/* ---------- ROOT ---------- */}
             <Route path="/" element={<RoleRedirect />} />
@@ -96,9 +114,10 @@ export default function App() {
               <Route index element={<ClassAccounts />} />
               <Route path="home" element={<ClassAccounts />} />
               <Route path="accounts" element={<ClassAccounts />} />
+              <Route path="liststudents" element={<ClassStudentList />} />
             </Route>
 
-            {/* ---------- STUDENTS ---------- */}
+            {/* ---------- STUDENT ---------- */}
             <Route
               path="/students/*"
               element={
@@ -113,17 +132,7 @@ export default function App() {
               <Route path="notification" element={<StudentNotification />} />
             </Route>
 
-            {/* ---------- DASHBOARD ---------- */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute roles={["admin", "class"]}>
-                  <StudentList />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* ---------- CARD DETAIL ---------- */}
+            {/* ---------- CARD ---------- */}
             <Route path="/card/:uid" element={<CardDetail />} />
 
             {/* ---------- FALLBACK ---------- */}

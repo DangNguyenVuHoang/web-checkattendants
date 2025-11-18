@@ -209,88 +209,102 @@ export default function StudentList() {
         )}
       </div>
 
-      {/* Table view: shown on lg and above */}
-      <div className="hidden lg:block">
-        <div className="overflow-x-auto bg-white rounded-lg shadow">
-          <table className="min-w-full divide-y">
-            <thead className="bg-blue-400 text-black">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-bold">UID</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">Họ tên</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">Phụ huynh</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">Lớp</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">SĐT PH</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">SĐT HS</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">Giới tính</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">Ngày sinh</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y">
-              {pagedEntries.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="p-6 text-center text-gray-500">Không có học sinh nào</td>
-                </tr>
-              ) : (
-                pagedEntries.map(([uid, s]) => (
-                  <tr key={uid} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-sm">{uid}</td>
-                    <td className="px-4 py-3 text-sm">{s.name || "-"}</td>
-                    <td className="px-4 py-3 text-sm">{s.parentName || "-"}</td>
-                    <td className="px-4 py-3 text-sm">{s.class || "-"}</td>
-                    <td className="px-4 py-3 text-sm">{s.parentPhone || "-"}</td>
-                    <td className="px-4 py-3 text-sm">{s.phone || "-"}</td>
-                    <td className="px-4 py-3 text-sm">{s.gender || "-"}</td>
-                    <td className="px-4 py-3 text-sm">{fmtDate(s.dob)}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setEditUID(uid)}
-                          className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 rounded-md"
-                        >
-                          ✏️
-                        </button>
-                        <a href={`/card/${uid}`} className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-md">🔎</a>
-                        <button
-                          // onClick={() => handleDeleteStudent(uid)}
-                          className="px-3 py-1 bg-gray-100 text-black rounded-md hover:bg-red-500 transition-colors"
-                        >
-                          📤 
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+{/* Table view: shown on lg and above */}
+<div className="hidden lg:block">
+  <section className="bg-white p-6 rounded-2xl shadow-md border">
+    <div className="overflow-x-auto rounded-2xl">
+      <table className="min-w-full text-sm divide-y">
+        <thead className="bg-blue-400 text-black">
+          <tr>
+            <th className="px-4 py-3 text-left font-bold text-sm">UID</th>
+            <th className="px-4 py-3 text-left font-bold text-sm">Họ tên</th>
+            <th className="px-4 py-3 text-left font-bold text-sm">Phụ huynh</th>
+            <th className="px-4 py-3 text-left font-bold text-sm">Lớp</th>
+            <th className="px-4 py-3 text-left font-bold text-sm">SĐT PH</th>
+            <th className="px-4 py-3 text-left font-bold text-sm">SĐT HS</th>
+            <th className="px-4 py-3 text-left font-bold text-sm">Giới tính</th>
+            <th className="px-4 py-3 text-left font-bold text-sm">Ngày sinh</th>
+            <th className="px-4 py-3 text-left font-bold text-sm">Thao tác</th>
+          </tr>
+        </thead>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-          <div className="text-sm text-gray-600">
-            Trang {page} / {totalPages}
-          </div>
-        </div>
-      )}
+        <tbody className="bg-white divide-y">
+          {pagedEntries.length === 0 ? (
+            <tr>
+              <td colSpan="9" className="p-6 text-center text-gray-500">
+                Không có học sinh nào
+              </td>
+            </tr>
+          ) : (
+            pagedEntries.map(([uid, s]) => (
+              <tr key={uid} className="hover:bg-gray-50">
+                <td className="px-4 py-3 font-mono text-sm">{uid}</td>
+                <td className="px-4 py-3 text-sm">{s.name || "-"}</td>
+                <td className="px-4 py-3 text-sm">{s.parentName || "-"}</td>
+                <td className="px-4 py-3 text-sm">{s.class || "-"}</td>
+                <td className="px-4 py-3 text-sm">{s.parentPhone || "-"}</td>
+                <td className="px-4 py-3 text-sm">{s.phone || "-"}</td>
+                <td className="px-4 py-3 text-sm">{s.gender || "-"}</td>
+                <td className="px-4 py-3 text-sm">{fmtDate(s.dob)}</td>
+
+                <td className="px-4 py-3 text-sm">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditUID(uid)}
+                      className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 rounded-md"
+                    >
+                      ✏️
+                    </button>
+                    <a
+                      href={`/card/${uid}`}
+                      className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-md"
+                    >
+                      🔎
+                    </a>
+                    <button
+                      className="px-3 py-1 bg-gray-100 hover:bg-red-500 text-black rounded-md"
+                    >
+                      📤
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+
+{/* Pagination */}
+<div className="mt-3 flex items-center justify-between">
+
+  <div className="flex gap-2">
+    <button
+      onClick={() => setPage((p) => Math.max(1, p - 1))}
+      disabled={page <= 1}
+      className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition"
+    >
+      Previous
+    </button>
+
+    <button
+      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+      disabled={page >= totalPages}
+      className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition"
+    >
+      Next
+    </button>
+  </div>
+
+  <div className="text-sm text-gray-600">
+    Trang {page} / {totalPages}
+  </div>
+</div>
+
+
 
       {editUID && <ModalEditStudent uid={editUID} onClose={() => setEditUID(null)} />}
     </div>

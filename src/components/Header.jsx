@@ -1,66 +1,88 @@
 // src/components/Header.jsx
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Home,
   Users,
-  ListChecks,
-  LogOut,
+  ClipboardList,
   Bell,
   IdCard,
+  LogOut,
+  Menu,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
 } from "lucide-react";
+import { ref, onValue } from "firebase/database";
+import { db } from "../firebase";
 
-/**
- * Sidebar (collapsible)
- * - Nhận `collapsed` và `setCollapsed` từ App.jsx
- * - Đồng bộ co/giãn toàn layout
- * - Mobile có drawer riêng
- */
 export default function Header({ collapsed, setCollapsed }) {
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const [open, setOpen] = useState(false); // mobile drawer
-  const [active, setActive] = useState(location.pathname);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loggedRaw = localStorage.getItem("rfid_logged_user");
   const logged = loggedRaw ? JSON.parse(loggedRaw) : null;
+
   const role = logged?.role || null;
-  const username = logged?.username || null;
+  const username = logged?.username || "";
+  const studentUID = logged?.uid || null;
 
+  /* ===========================
+      Unread notifications
+  =========================== */
   useEffect(() => {
-    setActive(location.pathname);
-    setOpen(false);
-  }, [location.pathname]);
+    if (role !== "student" || !studentUID) return;
 
-  const handleLogout = () => {
-    localStorage.removeItem("rfid_logged_user");
-    navigate("/login");
+    const notifRef = ref(db, `Notifications/${studentUID}`);
+
+    const unsub = onValue(notifRef, (snap) => {
+      const val = snap.val() || {};
+      const count = Object.values(val).filter((n) => n.status === "unread").length;
+      setUnreadCount(count);
+    });
+
+    return () => unsub();
+  }, [role, studentUID]);
+
+  const isActive = (path) =>
+    location.pathname === path || location.pathname.startsWith(path);
+
+  /* ===========================
+      NAV CONFIG
+  =========================== */
+  const navConfig = {
+    admin: [
+      { to: "/admin/home", label: "Admin Home", icon: Home },
+      { to: "/admin/liststudents", label: "List Students", icon: Users },
+      { to: "/admin/accounts", label: "Accounts", icon: ClipboardList },
+    ],
+    class: [
+      { to: "/class/home", label: "Class Home", icon: Home },
+      {
+        to: "/class/liststudents",
+        label: "Danh sách học sinh",
+        icon: GraduationCap,
+      },
+    ],
+    student: [
+      { to: "/students/home", label: "Thông tin", icon: IdCard },
+      {
+        to: "/students/checkattendance",
+        label: "Lịch sử điểm danh",
+        icon: ClipboardList,
+      },
+      {
+        to: "/students/notification",
+        label: unreadCount > 0 ? `Thông báo (${unreadCount})` : "Thông báo",
+        icon: Bell,
+        badge: unreadCount,
+      },
+    ],
   };
 
-  const navItem = (to, label, Icon) => {
-    const isActive = active === to || (to !== "/" && active?.startsWith(to));
-    return (
-      <Link
-        to={to}
-        key={to}
-        onClick={() => setActive(to)}
-        className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-          isActive
-            ? "bg-blue-600 text-white"
-            : "bg-gray-100 text-gray-800 hover:bg-blue-100"
-        }`}
-        title={collapsed ? label : undefined}
-      >
-        <Icon size={18} className="min-w-[18px]" />
-        {!collapsed && <span>{label}</span>}
-      </Link>
-    );
-  };
-
-  // default landing page per role
   const homeTarget =
     role === "admin"
       ? "/admin/home"
@@ -70,166 +92,180 @@ export default function Header({ collapsed, setCollapsed }) {
       ? "/students/home"
       : "/login";
 
+  const handleLogout = () => {
+    localStorage.removeItem("rfid_logged_user");
+    navigate("/login");
+  };
+
+  /* ===========================
+      RENDER ITEM - DESKTOP
+  =========================== */
+  const renderNavItem = (item, index) => {
+    const Icon = item.icon;
+    const active = isActive(item.to);
+
+    return (
+      <Link
+        key={index}
+        to={item.to}
+        className={`relative flex items-center gap-3 px-3 py-2 rounded-md text-sm cursor-pointer transition-all
+          ${
+            active
+              ? "bg-blue-500/80 text-white shadow-sm"
+              : "bg-blue-50/70 text-gray-800 hover:bg-blue-200/70 backdrop-blur"
+          }
+        `}
+        title={collapsed ? item.label : ""}
+      >
+        <Icon size={18} />
+        {!collapsed && <span>{item.label}</span>}
+
+        {item.badge > 0 && (
+          <span className="absolute right-2 top-2 bg-red-500 text-white text-xs rounded-full px-1.5 shadow">
+            {item.badge}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
   return (
     <>
-      {/* =========================
-          Top bar (mobile)
-      ========================== */}
-      <div className="md:hidden flex items-center justify-between p-3 bg-white border-b">
-        <div className="flex items-center gap-3">
-          <button
-            aria-label="Toggle menu"
-            onClick={() => setOpen((s) => !s)}
-            className="p-2 rounded-md bg-gray-100 hover:bg-blue-100"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
+      {/* ===========================
+          MOBILE TOPBAR
+      =========================== */}
+      <div className="md:hidden flex items-center justify-between 
+          bg-white/70 backdrop-blur-xl shadow-md p-3 border-b border-white/30">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="p-2 rounded bg-blue-100/50 hover:bg-blue-200"
+        >
+          <Menu size={20} />
+        </button>
 
-          <Link
-            to={homeTarget}
-            className="text-lg font-bold"
-            onClick={() => setActive(homeTarget)}
-          >
-            Thuận Hiếu Education
-          </Link>
-        </div>
+        <Link to={homeTarget} className="font-bold text-lg text-blue-700">
+          Thuận Hiếu Education
+        </Link>
 
-        {username ? (
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-medium">{username}</div>
-          </div>
-        ) : (
-          <Link
-            to="/login"
-            className="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-          >
-            Login
-          </Link>
-        )}
+        <div className="text-sm font-medium">{username}</div>
       </div>
 
-      {/* =========================
-          Desktop Sidebar
-      ========================== */}
-      <div
-        className={`hidden md:fixed md:inset-y-0 md:left-0 ${
-          collapsed ? "md:w-20" : "md:w-64"
-        } md:flex md:flex-col md:justify-between 
-        md:bg-white md:border-r transition-all duration-300`}
-      >
-        {/* --- Top Section --- */}
-        <div className="flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            {!collapsed ? (
-              <Link
-                to={homeTarget}
-                className="text-lg font-bold text-blue-700"
-                onClick={() => setActive(homeTarget)}
+      {/* ===========================
+          MOBILE DRAWER
+      =========================== */}
+      {drawerOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm">
+          <div className="absolute left-0 top-0 w-64 
+              bg-white/80 backdrop-blur-xl shadow-2xl h-full p-4 flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <span className="font-bold text-blue-700">Menu</span>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="p-1 hover:bg-blue-100 rounded"
               >
+                ✕
+              </button>
+            </div>
+
+            <nav className="flex flex-col gap-2">
+              {(navConfig[role] || []).map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setDrawerOpen(false)}
+                  className={`relative flex items-center gap-3 px-3 py-2 rounded text-sm
+                    ${
+                      isActive(item.to)
+                        ? "bg-blue-500 text-white"
+                        : "bg-blue-50 hover:bg-blue-100"
+                    }`}
+                >
+                  <item.icon size={18} />
+                  {item.label}
+
+                  {item.badge > 0 && (
+                    <span className="absolute right-3 top-2 
+                        bg-red-500 text-white text-xs rounded-full px-1.5 shadow">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </nav>
+
+            <div className="mt-auto pt-4 border-t border-white/40">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 shadow"
+              >
+                <LogOut size={18} /> Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===========================
+          DESKTOP SIDEBAR
+      =========================== */}
+      <aside
+        className={`
+          hidden md:flex md:flex-col md:justify-between md:fixed md:inset-y-0 md:left-0
+          shadow-xl border-r border-white/30
+          bg-white/60 backdrop-blur-xl
+          transition-all duration-300
+          ${collapsed ? "md:w-20" : "md:w-64"}
+        `}
+      >
+        {/* TOP */}
+        <div>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/40">
+            {!collapsed ? (
+              <Link to={homeTarget} className="text-lg font-bold text-blue-700">
                 Thuận Hiếu Education
               </Link>
             ) : (
-              <Link
-                to={homeTarget}
-                onClick={() => setActive(homeTarget)}
-                title="Thuận Hiếu Education"
-              >
+              <Link to={homeTarget}>
                 <Home size={22} className="text-blue-700" />
               </Link>
             )}
 
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="p-1 rounded hover:bg-blue-100"
-              title={collapsed ? "Mở rộng" : "Thu gọn"}
+              className="p-1 hover:bg-blue-200/60 rounded"
             >
               {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
             </button>
           </div>
 
-          {/* --- Navigation --- */}
-          <nav className="flex-1 p-3 space-y-1">
-            {role === "admin" && (
-              <>
-                {navItem("/admin/home", "Admin Home", Home)}
-                {navItem("/admin/liststudents", "List Students", Users)}
-                {navItem("/admin/accounts", "Accounts", ListChecks)}
-              </>
-            )}
-
-            {role === "class" && (
-              <>
-                {navItem("/class/home", "Class Home", Home)}
-                {navItem("/dashboard", "Class Dashboard", ListChecks)}
-                 {navItem("/class/sentnotification", "Sent Notification", ListChecks)}
-              </>
-            )}
-
-            {role === "student" && (
-              <>
-                {navItem("/students/home", "Thông tin", IdCard)}
-                {navItem(
-                  "/students/checkattendance",
-                  "Lịch sử điểm danh",
-                  ListChecks
-                )}
-                {navItem("/students/notification", "Thông báo", Bell)}
-              </>
-            )}
+          <nav className="p-3 space-y-1">
+            {(navConfig[role] || []).map((item, i) => renderNavItem(item, i))}
           </nav>
         </div>
 
-        {/* --- Bottom Section --- */}
-        <div className="border-t p-3 flex flex-col items-start">
-          {username ? (
-            <>
-              {!collapsed && (
-                <div className="mb-2">
-                  <div className="text-sm font-medium">{username}</div>
-                  <div className="text-xs text-gray-500">{role}</div>
-                </div>
-              )}
-              <button
-                onClick={handleLogout}
-                title="Đăng xuất"
-                className="flex items-center gap-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm w-full"
-              >
-                <LogOut size={18} />
-                {!collapsed && <span>Logout</span>}
-              </button>
-            </>
-          ) : (
-            <Link
-              to="/login"
-              className="w-full px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-center"
-            >
-              Login
-            </Link>
+        {/* BOTTOM */}
+        <div className="border-t border-white/30 p-3">
+          {!collapsed && (
+            <div className="mb-2">
+              <div className="text-sm font-semibold text-blue-800">{username}</div>
+              <div className="text-xs text-gray-600">{role}</div>
+            </div>
           )}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 shadow text-sm w-full"
+          >
+            <LogOut size={18} />
+            {!collapsed && <span>Logout</span>}
+          </button>
         </div>
-      </div>
+      </aside>
 
-      {/* =========================
-          Padding offset for main content
-      ========================== */}
+      {/* EMPTY padding */}
       <div
         className="hidden md:block transition-all duration-300"
-        style={{
-          paddingLeft: collapsed ? "80px" : "256px", // khớp với w-20 và w-64
-        }}
-      ></div>
+        style={{ paddingLeft: collapsed ? "80px" : "256px" }}
+      />
     </>
   );
 }
