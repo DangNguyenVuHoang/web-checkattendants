@@ -1,11 +1,76 @@
 // src/pages/AdminAccounts.jsx
 import { useEffect, useState } from "react";
-import { ref, set, get, onValue, remove, update } from "firebase/database";
+import { ref, set, get, onValue, update } from "firebase/database";
 import { db } from "../../firebase";
 import bcrypt from "bcryptjs";
 import toast from "react-hot-toast";
 
 const PAGE_SIZE = 8;
+
+// Tạo chuỗi ngày giờ dạng dd-mm-yyyy HH:MM:SS
+function getVNDateTimeString() {
+  const d = new Date();
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+
+  return `${day}-${month}-${year} ${hh}:${mm}:${ss}`;
+}
+
+// Parse string ngày (ISO hoặc dd-mm-yyyy HH:MM:SS) -> Date để SORT
+function parseVNDate(d) {
+  if (!d) return null;
+
+  // ISO: 2025-11-12T15:20:38.982Z
+  if (d.includes("T")) {
+    try {
+      const [datePart, timeRaw] = d.split("T");
+      const [year, month, day] = datePart.split("-").map(Number);
+      const timePart = timeRaw.replace("Z", "").split(".")[0]; // "15:20:38"
+      const [hh = 0, mm = 0, ss = 0] = timePart.split(":").map(Number);
+      return new Date(year, month - 1, day, hh, mm, ss);
+    } catch {
+      return null;
+    }
+  }
+
+  // VN: dd-mm-yyyy HH:MM:SS
+  try {
+    const [datePart, timePart = ""] = d.split(" ");
+    const [day, month, year] = datePart.split("-").map(Number);
+    const [hh = 0, mm = 0, ss = 0] = timePart.split(":").map(Number);
+    return new Date(year, month - 1, day, hh, mm, ss);
+  } catch {
+    return null;
+  }
+}
+
+// Format ra string để HIỂN THỊ
+function formatCreatedAt(d) {
+  if (!d) return "-";
+
+  // Nếu đã là dạng dd-mm-yyyy ... thì trả luôn
+  if (d.includes("-") && !d.includes("T")) return d;
+
+  // Nếu là ISO thì convert sang dd-mm-yyyy HH:MM:SS
+  if (d.includes("T")) {
+    try {
+      const [datePart, timeRaw] = d.split("T");
+      const [year, month, day] = datePart.split("-");
+      const timePart = timeRaw.replace("Z", "").split(".")[0]; // "15:20:38"
+      return `${day}-${month}-${year} ${timePart}`;
+    } catch {
+      return d;
+    }
+  }
+
+  // Trường hợp khác: trả nguyên
+  return d;
+}
 
 function ModalDetail({ account, onClose }) {
   const [studentName, setStudentName] = useState("");
@@ -41,9 +106,7 @@ function ModalDetail({ account, onClose }) {
           </div>
           <div>
             <b>Ngày tạo:</b>{" "}
-            {account.createdAt
-              ? new Date(account.createdAt).toLocaleString()
-              : "-"}
+            {account.createdAt ? formatCreatedAt(account.createdAt) : "-"}
           </div>
         </div>
         <button
@@ -92,17 +155,6 @@ function ModalUpdate({ account, classOptions, onClose, onUpdated }) {
       <div className="relative bg-white p-6 rounded-lg shadow-lg max-w-md w-full z-10">
         <h3 className="text-lg font-bold mb-2">Cập nhật tài khoản</h3>
         <div className="space-y-3">
-          {/* <div>
-            <label className="block text-sm font-medium mb-1">Role</label>
-            <select
-              value={role}
-              onChange={e => setRole(e.target.value)}
-              className="border rounded px-2 py-1 w-full"
-            >
-              <option value="admin">Admin</option>
-              <option value="class">Class</option>
-            </select>
-          </div> */}
           {role === "class" && (
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -199,8 +251,8 @@ export default function AdminAccounts() {
       }));
       // Sắp xếp theo createdAt mới nhất lên đầu
       arr.sort((a, b) => {
-        const ca = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const cb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        const ca = a.createdAt ? parseVNDate(a.createdAt)?.getTime() || 0 : 0;
+        const cb = b.createdAt ? parseVNDate(b.createdAt)?.getTime() || 0 : 0;
         return cb - ca;
       });
       setAccountsArr(arr);
@@ -232,7 +284,7 @@ export default function AdminAccounts() {
         passwordHash: hash,
         role,
         classManaged: role === "class" ? classManaged : null,
-        createdAt: new Date().toISOString(),
+        createdAt: getVNDateTimeString(), // dùng format VN
       });
 
       if (role === "class") {
@@ -318,21 +370,6 @@ export default function AdminAccounts() {
       toast.error("Lỗi xoá account");
     }
   };
-  // Hàm parse ngày tháng định dạng VN (dd-mm-yyyy hh:mm:ss) hoặc ISO
-  function parseVNDate(d) {
-    if (!d) return null;
-    // Nếu là ISO chuẩn -> parse được luôn
-    if (!isNaN(Date.parse(d))) return new Date(d);
-
-    try {
-      const [datePart, timePart] = d.split(" ");
-      const [day, month, year] = datePart.split("-").map(Number);
-      const [hh = 0, mm = 0, ss = 0] = (timePart || "").split(":").map(Number);
-      return new Date(year, month - 1, day, hh, mm, ss);
-    } catch (e) {
-      return null;
-    }
-  }
 
   // Phân trang + lọc
   const filteredAccounts = accountsArr
@@ -360,7 +397,8 @@ export default function AdminAccounts() {
     <div className="space-y-8">
       {/* --- Tạo tài khoản --- */}
       <section className="bg-white p-6 rounded-2xl shadow-md border">
-        <h3 className="text-xl font-semibold mb-6 text-gray-800">
+        <h3
+          className="text-xl font-semibold mb-6 text-gray-800">
           ⚙️ Tạo tài khoản Admin / Class
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

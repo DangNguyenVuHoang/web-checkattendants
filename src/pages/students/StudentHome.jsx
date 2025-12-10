@@ -17,10 +17,72 @@ import {
 } from "recharts";
 
 /**
+ * Parse chuỗi thời gian "DD-MM-YYYY HH:mm:ss" thành Date
+ * Ví dụ: "06-12-2025 00:50:58"
+ */
+function parseVNDateTime(str) {
+  if (!str) return null;
+  const [datePart, timePart] = str.split(" ");
+  if (!datePart) return null;
+
+  const [dd, mm, yyyy] = datePart.split("-").map(Number);
+  if (!dd || !mm || !yyyy) return null;
+
+  let hh = 0,
+    mi = 0,
+    ss = 0;
+  if (timePart) {
+    const t = timePart.split(":").map(Number);
+    hh = t[0] || 0;
+    mi = t[1] || 0;
+    ss = t[2] || 0;
+  }
+
+  return new Date(yyyy, mm - 1, dd, hh, mi, ss);
+}
+
+/**
+ * Format nhãn trục X (ngày) thành dạng dd/MM
+ */
+const formatDateTick = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d)) return value;
+  return d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+};
+
+/**
+ * Tooltip custom cho biểu đồ cột
+ */
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+
+  const d = new Date(label);
+  const fullDate = isNaN(d)
+    ? label
+    : d.toLocaleDateString("vi-VN", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+      });
+
+  const lenxe = payload.find((p) => p.dataKey === "lenxe")?.value ?? 0;
+  const xuongxe = payload.find((p) => p.dataKey === "xuongxe")?.value ?? 0;
+
+  return (
+    <div className="bg-white p-2 border rounded text-xs shadow">
+      <p className="font-semibold mb-1">{fullDate}</p>
+      <p>Lên xe: {lenxe}</p>
+      <p>Xuống xe: {xuongxe}</p>
+    </div>
+  );
+};
+
+/**
  * StudentHome
- * - Giao diện tổng hợp thông tin học sinh
- * - Biểu đồ điểm danh (Recharts)
- * - Dữ liệu lấy từ USER + RFID (realtime)
  */
 export default function StudentHome() {
   const [user, setUser] = useState(null);
@@ -53,32 +115,73 @@ export default function StudentHome() {
       const data = snap.val();
       setRfid(data);
 
-      // xử lý accessLog -> biểu đồ
-      const logs = data.accessLog ? Object.values(data.accessLog) : [];
+      // ===============================
+      // XỬ LÝ accessLog -> BIỂU ĐỒ CỘT
+      // ===============================
+      const rawLogs = data.accessLog ? Object.values(data.accessLog) : [];
+      const logs = rawLogs.filter((l) => l && l.time);
+
       const grouped = {};
+      const fmt = new Intl.DateTimeFormat("en-CA"); // -> YYYY-MM-DD
+
       logs.forEach((l) => {
-        const date = (l.time || "").split(" ")[0];
-        if (!grouped[date]) grouped[date] = { date, lenxe: 0, xuongxe: 0 };
-        if (l.status?.toLowerCase().includes("lên")) grouped[date].lenxe++;
-        else if (l.status?.toLowerCase().includes("xuống")) grouped[date].xuongxe++;
+        const d = parseVNDateTime(l.time); // dùng parser custom
+        if (!d || isNaN(d)) return;
+
+        const dateKey = fmt.format(d); // ví dụ "2025-12-06"
+
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = { date: dateKey, lenxe: 0, xuongxe: 0 };
+        }
+
+        const status = (l.status || "").toLowerCase();
+
+        // Firebase lưu: "Len-xe", "Xuong-xe"
+        if (status.startsWith("len")) {
+          grouped[dateKey].lenxe++;
+        } else if (status.startsWith("xuong")) {
+          grouped[dateKey].xuongxe++;
+        }
       });
 
-      const arr = Object.values(grouped)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
-        .slice(-7); // 7 ngày gần nhất
-      setChartData(arr);
+      // Tạo mảng 7 ngày gần nhất tính đến hôm nay (kể cả ngày 0 lần quẹt)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-      // thống kê tổng quát
-      const totalScans = logs.length;
-      const daysPresent = new Set(Object.keys(grouped)).size;
-      const daysAbsent = 7 - daysPresent; // giả định 1 tuần 7 ngày
+      const last7Days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const dateKey = fmt.format(d);
+
+        last7Days.push(
+          grouped[dateKey] || {
+            date: dateKey,
+            lenxe: 0,
+            xuongxe: 0,
+          }
+        );
+      }
+
+      setChartData(last7Days);
+
+      // ===============================
+      // THỐNG KÊ TỔNG QUÁT ĐIỂM DANH (7 ngày gần nhất)
+      // ===============================
+      const totalScans = logs.length; // tổng log (toàn bộ)
+      const daysPresent = last7Days.filter((d) => d.lenxe > 0).length; // có ít nhất 1 lần Len-xe
+      const daysAbsent = last7Days.length - daysPresent; // còn lại là vắng
+
       const lastScanTime =
         logs.length > 0
-          ? logs.sort(
-              (a, b) =>
-                new Date(b.time).getTime() - new Date(a.time).getTime()
-            )[0].time
+          ? logs
+              .slice()
+              .sort(
+                (a, b) =>
+                  parseVNDateTime(b.time) - parseVNDateTime(a.time)
+              )[0].time
           : "-";
+
       setAttendance({ daysPresent, daysAbsent, totalScans, lastScanTime });
     });
 
@@ -110,15 +213,35 @@ export default function StudentHome() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         {/* Cột 1: Thông tin HS */}
         <div className="bg-white shadow rounded-xl p-4 text-sm">
-          <h3 className="font-semibold text-gray-800 mb-2">Thông tin học sinh</h3>
+          <h3 className="font-semibold text-gray-800 mb-2">
+            Thông tin học sinh
+          </h3>
           <table className="w-full border text-sm">
             <tbody>
-              <tr><td className="border p-2 w-1/3 font-medium">Họ tên</td><td className="border p-2">{user.name}</td></tr>
-              <tr><td className="border p-2">Ngày sinh</td><td className="border p-2">{user.dob}</td></tr>
-              <tr><td className="border p-2">Lớp</td><td className="border p-2">{user.class}</td></tr>
-              <tr><td className="border p-2">Giới tính</td><td className="border p-2">{user.gender || "-"}</td></tr>
-              <tr><td className="border p-2">Địa chỉ</td><td className="border p-2">{user.address || "-"}</td></tr>
-              <tr><td className="border p-2">SĐT</td><td className="border p-2">{user.phone}</td></tr>
+              <tr>
+                <td className="border p-2 w-1/3 font-medium">Họ tên</td>
+                <td className="border p-2">{user.name}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Ngày sinh</td>
+                <td className="border p-2">{user.dob}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Lớp</td>
+                <td className="border p-2">{user.class}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Giới tính</td>
+                <td className="border p-2">{user.gender || "-"}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Địa chỉ</td>
+                <td className="border p-2">{user.address || "-"}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">SĐT</td>
+                <td className="border p-2">{user.phone}</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -126,14 +249,18 @@ export default function StudentHome() {
         {/* Cột 2: Biểu đồ cột */}
         <div className="bg-white shadow rounded-xl p-4">
           <h3 className="text-center font-semibold text-sm mb-2 text-gray-700">
-            Biểu đồ số lần lên - xuống xe (5 ngày gần nhất)
+            Biểu đồ số lần lên - xuống xe (7 ngày gần nhất)
           </h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatDateTick}
+                tick={{ fontSize: 11 }}
+              />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip content={<CustomTooltip />} />
               <Legend />
               <Bar dataKey="lenxe" fill="#165dfc" name="Lên xe" />
               <Bar dataKey="xuongxe" fill="#52a1ff" name="Xuống xe" />
@@ -141,7 +268,7 @@ export default function StudentHome() {
           </ResponsiveContainer>
         </div>
 
-        {/* Cột 3: Biểu đồ tròn */}
+        {/* Cột 3: Biểu đồ tròn (chưa đổi logic, sẽ chỉnh sau nếu cần) */}
         <div className="bg-white shadow rounded-xl p-4">
           <h3 className="text-center font-semibold text-sm mb-2 text-gray-700">
             Số ngày đã đi học trong một tuần
@@ -178,11 +305,20 @@ export default function StudentHome() {
           </h3>
           <table className="w-full border text-sm">
             <tbody>
-              <tr><td className="border p-2 w-1/3 font-medium">Họ tên phụ huynh</td><td className="border p-2">{user.parentName || "Null"}</td></tr>
-              {/* <tr><td className="border p-2">Họ tên cha</td><td className="border p-2">{user.fatherName || "Nguyễn Đình Dũng"}</td></tr> */}
-              <tr><td className="border p-2">Địa chỉ liên hệ</td><td className="border p-2">{user.address || "Null"}</td></tr>
-              <tr><td className="border p-2">Điện thoại phụ huynh</td><td className="border p-2">{user.parentPhone || "Null"}</td></tr>
-              {/* <tr><td className="border p-2">Điện thoại cha</td><td className="border p-2">{user.parentPhone || "6745784912"}</td></tr> */}
+              <tr>
+                <td className="border p-2 w-1/3 font-medium">
+                  Họ tên phụ huynh
+                </td>
+                <td className="border p-2">{user.parentName || "Null"}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Địa chỉ liên hệ</td>
+                <td className="border p-2">{user.address || "Null"}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Điện thoại phụ huynh</td>
+                <td className="border p-2">{user.parentPhone || "Null"}</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -194,10 +330,24 @@ export default function StudentHome() {
           </h3>
           <table className="w-full border text-sm">
             <tbody>
-              <tr><td className="border p-2 w-1/2 font-medium">Tổng số lượt quẹt</td><td className="border p-2">{attendance.totalScans}</td></tr>
-              <tr><td className="border p-2">Số ngày đi học</td><td className="border p-2">{attendance.daysPresent}</td></tr>
-              <tr><td className="border p-2">Số ngày vắng</td><td className="border p-2">{attendance.daysAbsent}</td></tr>
-              <tr><td className="border p-2">Lần quẹt gần nhất</td><td className="border p-2">{attendance.lastScanTime}</td></tr>
+              <tr>
+                <td className="border p-2 w-1/2 font-medium">
+                  Tổng số lượt quẹt
+                </td>
+                <td className="border p-2">{attendance.totalScans}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Số ngày đi học 7 ngày gần nhất</td>
+                <td className="border p-2">{attendance.daysPresent}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Số ngày vắng 7 ngày gần nhất</td>
+                <td className="border p-2">{attendance.daysAbsent}</td>
+              </tr>
+              <tr>
+                <td className="border p-2">Lần quẹt gần nhất</td>
+                <td className="border p-2">{attendance.lastScanTime}</td>
+              </tr>
             </tbody>
           </table>
         </div>

@@ -8,6 +8,18 @@ export default function ModalEditStudent({ uid, onClose }) {
   const [form, setForm] = useState(null);
   const [classOptions, setClassOptions] = useState([]);
 
+function getVNDateTimeString() {
+  const d = new Date();
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+
+  return `${day}-${month}-${year} ${hh}:${mm}:${ss}`;
+}
+
   // Load thông tin học sinh
   useEffect(() => {
     get(ref(db, `USER/${uid}`)).then(snap => {
@@ -29,6 +41,8 @@ export default function ModalEditStudent({ uid, onClose }) {
   const handleChange = (e) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
+
+
 const handleSave = async () => {
   try {
     const oldClass = form.class || null;
@@ -42,37 +56,91 @@ const handleSave = async () => {
     updates[`USER/${uid}/parentPhone`] = form.parentPhone || "";
     updates[`USER/${uid}/class`] = newClass || null;
 
-    // 2. Nếu đổi lớp
-    if (oldClass && oldClass !== newClass) {
-      // 2.1 Lấy dữ liệu cũ trong classOld/students/uid
-      const oldClassDataSnap = await get(ref(db, `Class/${oldClass}/students/${uid}`));
-      const oldClassData = oldClassDataSnap.val() || {
-        movedAt: new Date().toISOString(),
-      };
-
-      // 2.2 Xóa khỏi lớp cũ
-      updates[`Class/${oldClass}/students/${uid}`] = null;
-
-      // 2.3 Ghi đầy đủ Data cũ sang lớp mới
-      updates[`Class/${newClass}/students/${uid}`] = oldClassData;
+    // 1.1 Cập nhật ACCOUNTS.classManaged (nếu có)
+    const accountsSnap = await get(ref(db, "ACCOUNTS"));
+    const accounts = accountsSnap.val() || {};
+    let accountKey = null;
+    for (const key in accounts) {
+      if (accounts[key]?.uid === uid) {
+        accountKey = key;
+        break;
+      }
+    }
+    if (accountKey) {
+      updates[`ACCOUNTS/${accountKey}/classManaged`] = newClass || null;
     }
 
-    // Nếu không đổi lớp → không đụng tới node Class
+    // 2. ĐỔI LỚP (đã có lớp cũ và khác lớp mới)
+    if (oldClass && newClass && oldClass !== newClass) {
+      const ts = getVNDateTimeString();
+
+      // Lấy full data từ USER
+      const userSnap = await get(ref(db, `USER/${uid}`));
+      const userData = userSnap.val() || {};
+
+      // Lấy data từ Class/oldClass/students/uid nếu có
+      const oldStudentSnap = await get(
+        ref(db, `Class/${oldClass}/students/${uid}`)
+      );
+
+      let baseData = {};
+
+      if (oldStudentSnap.exists()) {
+        // ✅ GIỮ NGUYÊN TOÀN BỘ DATA CŨ CỦA NODE CLASS
+        baseData = oldStudentSnap.val() || {};
+      } else {
+        // Không có node cũ → build lại từ USER
+        baseData = {
+          uid,
+          name: userData.name || form.name || "",
+          email: userData.email || form.email || "",
+          createdAt: userData.createdAt || ts,
+        };
+      }
+
+      // Gộp lại: data cũ + movedAt mới
+      const newClassStudentNode = {
+        ...baseData,
+        movedAt: ts,
+      };
+
+      // Xoá khỏi lớp cũ
+      updates[`Class/${oldClass}/students/${uid}`] = null;
+
+      // Ghi FULL DATA sang lớp mới
+      updates[`Class/${newClass}/students/${uid}`] = newClassStudentNode;
+    }
+
+    // 3. GÁN LỚP LẦN ĐẦU (chưa có oldClass, giờ chọn newClass)
     if (!oldClass && newClass) {
+      const ts = getVNDateTimeString();
+
+      const userSnap = await get(ref(db, `USER/${uid}`));
+      const userData = userSnap.val() || {};
+
       updates[`Class/${newClass}/students/${uid}`] = {
-        createdAt: new Date().toISOString(),
+        uid,
+        name: userData.name || form.name || "",
+        email: userData.email || form.email || "",
+        createdAt: userData.createdAt || ts,
       };
     }
 
     await update(ref(db), updates);
 
-    toast.success("Đã cập nhật thông tin & giữ nguyên dữ liệu lớp cũ");
+    toast.success(
+      "Đã cập nhật thông tin, chuyển đầy đủ dữ liệu lớp cũ sang lớp mới và thêm movedAt."
+    );
     onClose();
   } catch (err) {
     console.error(err);
     toast.error("Lỗi lưu thông tin");
   }
 };
+
+
+
+
 
 
   return createPortal(
