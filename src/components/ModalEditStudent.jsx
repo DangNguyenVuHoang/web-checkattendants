@@ -162,6 +162,8 @@ const handleSave = async () => {
           />
 
           {/* --- Dropdown chọn lớp mới --- */}
+          {/* <div className="border p-2 rounded w-full"
+          >Học lớp: {form.class}</div> */}
           <select
             name="newClass"
             value={form.newClass || form.class || ""}

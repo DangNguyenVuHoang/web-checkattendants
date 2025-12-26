@@ -32,7 +32,7 @@ export default function Sidebar() {
           <button onClick={() => setOpenMobile(v => !v)} className="p-2 rounded bg-purple-700 text-white">
             ☰
           </button>
-          <Link to="/" className="font-bold text-lg">THUẬN HIẾU</Link>
+          <Link to="/" className="font-bold text-lg">Primary School</Link>
         </div>
         <div className="text-sm text-gray-600">Admin</div>
       </div>
@@ -51,10 +51,10 @@ export default function Sidebar() {
             <h3 className="text-white mt-3 font-bold">TRƯỜNG TIỂU HỌC</h3>
           </div>
           <nav className="flex flex-col gap-2">
-            {navItem("/admin/home", "Thông tin", null)}
-            {navItem("/admin/liststudents", "Lịch sử điểm danh", null)}
-            {navItem("/admin/accounts", "Tài khoản", null)}
-            <div className="mt-4 border-t border-white/10 pt-3 text-white/80 text-xs">© Thuận Hiếu</div>
+            {navItem("/admin/home", "Admin Home", null)}
+            {navItem("/admin/liststudents", "Attendance Histories", null)}
+            {navItem("/admin/accounts", "Account", null)}
+            <div className="mt-4 border-t border-white/10 pt-3 text-white/80 text-xs">© Primary School</div>
           </nav>
         </aside>
       </div>
@@ -65,7 +65,7 @@ export default function Sidebar() {
           <div className="bg-white/10 rounded p-3 flex items-center justify-center">
             <div className="w-16 h-16 rounded bg-white/30 flex items-center justify-center text-3xl font-bold text-white">TH</div>
           </div>
-          <h3 className="text-white mt-3 font-bold text-lg">TRƯỜNG TIỂU HỌC THUẬN HIẾU</h3>
+          <h3 className="text-white mt-3 font-bold text-lg">Primary School</h3>
         </div>
 
         <nav className="flex-1 flex flex-col gap-2">

@@ -198,7 +198,7 @@ export default function StudentHome() {
       {/* Header */}
       <div className="bg-blue-800 text-white rounded-t-xl p-4 mb-6">
         <h1 className="text-2xl font-bold uppercase">
-          TRƯỜNG TIỂU HỌC THUẬN HIẾU
+          Primary School
         </h1>
       </div>
 

@@ -126,20 +126,6 @@ export default function ClassStudentList() {
             onChange={(e) => setSearch(e.target.value)}
             className="border rounded px-2 py-1 text-sm"
           />
-
-          <input
-            type="date"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
-          />
-
-          <input
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
-          />
         </div>
 
         <div className="text-sm text-gray-600">
@@ -168,12 +154,12 @@ export default function ClassStudentList() {
                 </div>
 
                 <div className="mt-4 flex gap-2">
-                  <button
+                  {/* <button
                     onClick={() => setEditUID(uid)}
                     className="flex-1 px-3 py-2 bg-yellow-400 rounded hover:bg-yellow-500"
                   >
                     ✏️
-                  </button>
+                  </button> */}
 
                   <a href={`/card/${uid}`} className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">
                     🔎
@@ -209,7 +195,7 @@ export default function ClassStudentList() {
                   <th className="px-4 py-3 text-left">UID</th>
                   <th className="px-4 py-3 text-left">Họ tên</th>
                   <th className="px-4 py-3 text-left">Phụ huynh</th>
-                  <th className="px-4 py-3 text-left">SĐT PH</th>
+                  {/* <th className="px-4 py-3 text-left">SĐT PH</th> */}
                   <th className="px-4 py-3 text-left">SĐT HS</th>
                   <th className="px-4 py-3 text-left">Giới tính</th>
                   <th className="px-4 py-3 text-left">Ngày sinh</th>
@@ -230,19 +216,19 @@ export default function ClassStudentList() {
                       <td className="px-4 py-3 font-mono">{uid}</td>
                       <td className="px-4 py-3">{s.name}</td>
                       <td className="px-4 py-3">{s.parentName || "-"}</td>
-                      <td className="px-4 py-3">{s.parentPhone || "-"}</td>
+                      {/* <td className="px-4 py-3">{s.parentPhone || "-"}</td> */}
                       <td className="px-4 py-3">{s.phone || "-"}</td>
                       <td className="px-4 py-3">{s.gender || "-"}</td>
                       <td className="px-4 py-3">{fmtDate(s.dob)}</td>
 
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
-                          <button
+                          {/* <button
                             onClick={() => setEditUID(uid)}
                             className="px-3 py-1 bg-yellow-400 rounded hover:bg-yellow-500"
                           >
                             ✏️
-                          </button>
+                          </button> */}
 
                           <a href={`/card/${uid}`} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">
                             🔎

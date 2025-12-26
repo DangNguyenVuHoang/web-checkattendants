@@ -63,20 +63,20 @@ export default function Header({ collapsed, setCollapsed }) {
       { to: "/class/home", label: "Class Home", icon: Home },
       {
         to: "/class/liststudents",
-        label: "Danh sách học sinh",
+        label: "List Students",
         icon: GraduationCap,
       },
     ],
     student: [
-      { to: "/students/home", label: "Thông tin", icon: IdCard },
+      { to: "/students/home", label: "Student Home", icon: IdCard },
       {
         to: "/students/checkattendance",
-        label: "Lịch sử điểm danh",
+        label: "Attendance Histories",
         icon: ClipboardList,
       },
       {
         to: "/students/notification",
-        label: unreadCount > 0 ? `Thông báo (${unreadCount})` : "Thông báo",
+        label: unreadCount > 0 ? `Notifications (${unreadCount})` : "Notifications",
         icon: Bell,
         badge: unreadCount,
       },
@@ -144,7 +144,7 @@ export default function Header({ collapsed, setCollapsed }) {
         </button>
 
         <Link to={homeTarget} className="font-bold text-lg text-blue-700">
-          Thuận Hiếu Education
+           Primary School
         </Link>
 
         <div className="text-sm font-medium">{username}</div>
@@ -222,7 +222,7 @@ export default function Header({ collapsed, setCollapsed }) {
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/40">
             {!collapsed ? (
               <Link to={homeTarget} className="text-lg font-bold text-blue-700">
-                Thuận Hiếu Education
+                Primary School
               </Link>
             ) : (
               <Link to={homeTarget}>

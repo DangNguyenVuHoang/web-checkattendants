@@ -229,14 +229,14 @@ export default function ClassAccounts() {
                       </div>
                     </div>
                     <div className="mt-3 flex gap-2">
-                      <Link
+                      {/* <Link
                         to={`/card/${uid}`}
                         className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
                       >
                         Xem thẻ
-                      </Link>
+                      </Link> */}
                       <button
-                        className="px-3 py-1 bg-gray-200 rounded text-sm"
+                        className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
                         onClick={() => navigate(`/card/${uid}`)}
                       >
                         Chi tiết
@@ -293,14 +293,14 @@ export default function ClassAccounts() {
                       <td className="p-2">{u.parentPhone || "-"}</td>
                       <td className="p-2">
                         <div className="flex gap-2">
-                          <Link
+                          {/* <Link
                             to={`/card/${uid}`}
                             className="px-2 py-1 bg-blue-600 text-white rounded text-sm"
                           >
                             Xem thẻ
-                          </Link>
+                          </Link> */}
                           <button
-                            className="px-2 py-1 bg-gray-200 rounded text-sm"
+                            className="px-2 py-1 bg-blue-600 text-white rounded text-sm"
                             onClick={() => navigate(`/card/${uid}`)}
                           >
                             Chi tiết
