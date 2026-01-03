@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ref, onValue, update } from "firebase/database";
 import { db } from "../../firebase";
 import toast from "react-hot-toast";
 
-const PAGE_SIZE = 6; // 🔥 số thông báo mỗi trang
+const PAGE_SIZE = 6;
 
 export default function StudentNotification() {
   const [list, setList] = useState([]);
@@ -28,23 +28,31 @@ export default function StudentNotification() {
       }));
 
       arr.sort((a, b) => new Date(b.time) - new Date(a.time));
-
       setList(arr);
     });
 
     return () => unsub();
   }, [studentUID]);
 
-  /* ---------------- UPDATE STATUS ---------------- */
+  /* ---------------- MARK READ (ON CLICK) ---------------- */
   const markAsRead = async (notifID) => {
     try {
       await update(ref(db, `Notifications/${studentUID}/${notifID}`), {
         status: "read",
       });
+      // Không toast cũng được, nhưng để user biết đã cập nhật
       toast.success("Đã đánh dấu đã đọc");
     } catch {
       toast.error("Không thể cập nhật");
     }
+  };
+
+  const handleOpenNotif = (n) => {
+    // Nếu đã đọc rồi thì không update nữa
+    if (n.status === "read") return;
+
+    // Click vào card -> set read
+    markAsRead(n.id);
   };
 
   const markAllRead = async () => {
@@ -64,20 +72,36 @@ export default function StudentNotification() {
 
   /* ---------------- PAGINATION ---------------- */
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const pagedList = useMemo(
+    () => list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [list, page]
+  );
 
-  const pagedList = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  // Auto reset page khi list thay đổi, tránh lỗi trang vượt
+  // Auto reset page khi list thay đổi
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
-  }, [list.length, totalPages]);
+  }, [page, totalPages]);
 
   const fmt = (d) => {
     if (!d) return "-";
     try {
-      return new Date(d).toLocaleString();
+      const dt = new Date(d);
+      return isNaN(dt) ? String(d) : dt.toLocaleString();
     } catch {
-      return d;
+      return String(d);
+    }
+  };
+
+  const renderTypeLabel = (type) => {
+    switch (type) {
+      case "sleepy":
+        return { text: "Buồn ngủ", cls: "bg-yellow-300 text-yellow-900" };
+      case "health":
+        return { text: "Sức khoẻ", cls: "bg-red-300 text-red-900" };
+      case "custom":
+        return { text: "Tuỳ chỉnh", cls: "bg-gray-300 text-gray-900" };
+      default:
+        return { text: type || "-", cls: "bg-gray-300 text-gray-900" };
     }
   };
 
@@ -106,51 +130,54 @@ export default function StudentNotification() {
         <>
           {/* ---------------- LIST ---------------- */}
           <div className="space-y-3">
-            {pagedList.map((n) => (
-              <div
-                key={n.id}
-                className={`p-4 border rounded shadow-sm ${
-                  n.status === "unread" ? "bg-blue-50" : "bg-gray-50"
-                }`}
-              >
-                {/* TAG + TIME */}
-                <div className="flex justify-between items-center">
-                  <span
-                    className={`px-2 py-1 text-xs rounded ${
-                      n.type === "sleepy"
-                        ? "bg-yellow-300"
-                        : n.type === "health"
-                        ? "bg-red-300"
-                        : n.type === "focus"
-                        ? "bg-green-300"
-                        : "bg-gray-300"
-                    }`}
-                  >
-                    {n.type}
-                  </span>
+            {pagedList.map((n) => {
+              const typeInfo = renderTypeLabel(n.type);
 
-                  <span className="text-xs text-gray-500">{fmt(n.time)}</span>
+              return (
+                <div
+                  key={n.id}
+                  onClick={() => handleOpenNotif(n)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") handleOpenNotif(n);
+                  }}
+                  className={`p-4 border rounded shadow-sm cursor-pointer transition ${
+                    n.status === "unread"
+                      ? "bg-blue-50 hover:bg-blue-100"
+                      : "bg-gray-50 hover:bg-gray-100"
+                  }`}
+                  title="Bấm để xem (tự đánh dấu đã đọc)"
+                >
+                  {/* TAG + TIME */}
+                  <div className="flex justify-between items-center">
+                    <span className={`px-2 py-1 text-xs rounded ${typeInfo.cls}`}>
+                      {typeInfo.text}
+                    </span>
+
+                    <span className="text-xs text-gray-500">{fmt(n.time)}</span>
+                  </div>
+
+                  {/* MESSAGE */}
+                  <div className="mt-2 text-sm text-gray-800 whitespace-pre-line">
+                    {n.message}
+                  </div>
+
+                  {/* SENT BY + STATUS */}
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
+                    <span>Gửi bởi: {n.sentBy || "-"}</span>
+
+                    <span
+                      className={`flex items-center gap-1 ${
+                        n.status === "read" ? "text-green-600" : "text-blue-600"
+                      }`}
+                    >
+                      {n.status === "read" ? "🟢 Đã xem" : "🔵 Chưa xem"}
+                    </span>
+                  </div>
                 </div>
-
-                {/* MESSAGE */}
-                <div className="mt-2 text-sm text-gray-800">{n.message}</div>
-
-                {/* SENT BY */}
-                <div className="mt-1 text-xs text-gray-600">
-                  Gửi bởi: {n.sentBy || "-"}
-                </div>
-
-                {/* MARK READ BUTTON */}
-                {n.status === "unread" && (
-                  <button
-                    onClick={() => markAsRead(n.id)}
-                    className="mt-3 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                  >
-                    Đánh dấu đã đọc
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* ---------------- PAGINATION ---------------- */}

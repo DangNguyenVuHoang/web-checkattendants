@@ -13,6 +13,7 @@ const PAGE_SIZE = 8;
 
 export default function ClassStudentList() {
   const [students, setStudents] = useState([]);
+  const [rfidMap, setRfidMap] = useState({}); // ✅ realtime RFID cache
   const [page, setPage] = useState(1);
 
   const [editUID, setEditUID] = useState(null);
@@ -70,27 +71,29 @@ export default function ClassStudentList() {
     return new Date(yyyy, mm - 1, dd, hh, mi, ss);
   };
 
-  /* ---------------- STATUS NORMALIZE (FIX SAI MÀU) ---------------- */
+  /* ---------------- STATUS NORMALIZE ---------------- */
   const normalizeText = (str) => {
     if (!str) return "";
     return str
       .toString()
       .trim()
       .toLowerCase()
-      .normalize("NFD") // tách dấu tiếng Việt
-      .replace(/[\u0300-\u036f]/g, "") // xoá dấu
-      .replace(/[^a-z0-9]/g, ""); // xoá tất cả ký tự đặc biệt: space, -, _, ...
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "");
   };
 
   // "Xuong-xe" -> offboard, "Len-xe" -> onboard
   const normalizeRFIDStatus = (raw) => {
     if (!raw) return null;
-    const s = normalizeText(raw); // "Xuong-xe" -> "xuongxe"
+    const s = normalizeText(raw);
 
-    if (["lenxe", "onboard", "in", "pickup", "boarded"].includes(s)) return "onboard";
-    if (["xuongxe", "offboard", "out", "dropoff", "alighted"].includes(s)) return "offboard";
+    if (["lenxe", "onboard", "in", "pickup", "boarded"].includes(s))
+      return "onboard";
+    if (["xuongxe", "offboard", "out", "dropoff", "alighted"].includes(s))
+      return "offboard";
 
-    return s; // trạng thái khác
+    return null; // nếu khác thì coi như chưa có dữ liệu (để tránh hiển thị vàng linh tinh)
   };
 
   // UI badge status
@@ -116,25 +119,26 @@ export default function ClassStudentList() {
       };
     }
 
-    if (!status) {
-      return {
-        label: "Chưa có dữ liệu",
-        pillClass: "bg-gray-50 text-gray-600 border border-gray-200",
-        dotClass: "bg-gray-400",
-        updatedAt: null,
-      };
-    }
-
-    // status khác
     return {
-      label: `Trạng thái: ${status}`,
-      pillClass: "bg-yellow-50 text-yellow-700 border border-yellow-200",
-      dotClass: "bg-yellow-500",
-      updatedAt,
+      label: "Chưa có dữ liệu",
+      pillClass: "bg-gray-50 text-gray-600 border border-gray-200",
+      dotClass: "bg-gray-400",
+      updatedAt: null,
     };
   };
 
-  /* ---------------- LOAD STUDENTS + RFID ---------------- */
+  /* =====================================================
+     ✅ REALTIME RFID (auto update liên tục)
+     ===================================================== */
+  useEffect(() => {
+    const rfidRef = ref(db, "RFID");
+    const unsub = onValue(rfidRef, (snap) => {
+      setRfidMap(snap.val() || {});
+    });
+    return () => unsub();
+  }, []);
+
+  /* ---------------- LOAD STUDENTS + MERGE RFID ---------------- */
   useEffect(() => {
     if (!classManaged) return;
 
@@ -147,28 +151,21 @@ export default function ClassStudentList() {
 
         const results = await Promise.all(
           uids.map(async (uid) => {
-            // 1) USER
+            // USER
             const userSnap = await get(ref(db, `USER/${uid}`));
             if (!userSnap.exists()) return null;
             const userData = userSnap.val();
 
-            // 2) RFID schema của bạn:
-            // RFID/{uid}/createdAt: "17-12-2025 23:01:02"
-            // RFID/{uid}/lastStatus: "Xuong-xe"
-            const rfidSnap = await get(ref(db, `RFID/${uid}`));
-            const rfid = rfidSnap.val() || null;
-
+            // RFID realtime (không dùng get nữa)
+            const rfid = rfidMap?.[uid] || null;
             const rawStatus = rfid?.lastStatus || null;
             const atStr = rfid?.createdAt || null;
 
-            const normalized = normalizeRFIDStatus(rawStatus);
-            const atParsed = parseVNDateTime(atStr); // Date hoặc null
-
             const merged = {
               ...userData,
-              attendanceStatus: normalized, // onboard/offboard/...
-              attendanceUpdatedAt: atParsed || atStr || null,
-              _rfidRawStatus: rawStatus || null, // debug nếu cần
+              attendanceStatus: normalizeRFIDStatus(rawStatus),
+              attendanceUpdatedAt: parseVNDateTime(atStr) || null,
+              _rfidRawStatus: rawStatus || null,
             };
 
             return [uid, merged];
@@ -192,7 +189,7 @@ export default function ClassStudentList() {
     });
 
     return () => unsub();
-  }, [classManaged]);
+  }, [classManaged, rfidMap]); // 🔥 rfidMap đổi -> merge lại -> UI đổi ngay
 
   /* ---------------- FILTERING ---------------- */
   const visibleEntries = useMemo(() => {
@@ -292,8 +289,12 @@ export default function ClassStudentList() {
                 >
                   <div>
                     <div className="flex justify-between mb-2">
-                      <div className="text-sm text-gray-500 font-mono">{uid}</div>
-                      <div className="text-xs text-gray-400">{s?.class || "-"}</div>
+                      <div className="text-sm text-gray-500 font-mono">
+                        {uid}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {s?.class || "-"}
+                      </div>
                     </div>
 
                     <div className="text-lg font-semibold">{s?.name}</div>
@@ -305,9 +306,15 @@ export default function ClassStudentList() {
                     <div className="mt-3">
                       <div
                         className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${st.pillClass}`}
-                        title={st.updatedAt ? `Cập nhật: ${fmtDateTime(st.updatedAt)}` : ""}
+                        title={
+                          st.updatedAt
+                            ? `Cập nhật: ${fmtDateTime(st.updatedAt)}`
+                            : ""
+                        }
                       >
-                        <span className={`w-2 h-2 rounded-full ${st.dotClass}`} />
+                        <span
+                          className={`w-2 h-2 rounded-full ${st.dotClass}`}
+                        />
                         <span className="font-semibold">{st.label}</span>
                         {st.updatedAt ? (
                           <span className="text-xs opacity-70">
@@ -316,13 +323,13 @@ export default function ClassStudentList() {
                         ) : null}
                       </div>
                     </div>
-
-                    {/* Debug nếu cần */}
-                    {/* <div className="mt-2 text-xs text-gray-400">raw: {s?._rfidRawStatus || "-"}</div> */}
                   </div>
 
                   <div className="mt-4 flex gap-2">
-                    <a href={`/card/${uid}`} className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">
+                    <a
+                      href={`/card/${uid}`}
+                      className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                    >
                       🔎
                     </a>
 
@@ -386,15 +393,16 @@ export default function ClassStudentList() {
                         <td className="px-4 py-3">
                           <div
                             className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${st.pillClass}`}
-                            title={st.updatedAt ? `Cập nhật: ${fmtDateTime(st.updatedAt)}` : ""}
+                            title={
+                              st.updatedAt
+                                ? `Cập nhật: ${fmtDateTime(st.updatedAt)}`
+                                : ""
+                            }
                           >
-                            <span className={`w-2 h-2 rounded-full ${st.dotClass}`} />
+                            <span
+                              className={`w-2 h-2 rounded-full ${st.dotClass}`}
+                            />
                             <span className="font-semibold">{st.label}</span>
-                            {st.updatedAt ? (
-                              <span className="text-xs opacity-70">
-                                {/* • {fmtDateTime(st.updatedAt)} */}
-                              </span>
-                            ) : null}
                           </div>
                         </td>
 
@@ -404,7 +412,10 @@ export default function ClassStudentList() {
 
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
-                            <a href={`/card/${uid}`} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">
+                            <a
+                              href={`/card/${uid}`}
+                              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                            >
                               🔎
                             </a>
 
@@ -421,16 +432,6 @@ export default function ClassStudentList() {
                             >
                               📄
                             </button>
-
-                            {/* nếu cần xoá */}
-                            {/* 
-                            <button
-                              onClick={() => handleDeleteStudent(uid)}
-                              className="px-3 py-1 bg-red-200 rounded hover:bg-red-300"
-                            >
-                              🗑️
-                            </button>
-                            */}
                           </div>
                         </td>
                       </tr>
@@ -443,7 +444,7 @@ export default function ClassStudentList() {
         </section>
       </div>
 
-      {/* ---------------- PAGINATION ---------------- */}
+      {/* ---------------- PAGINATION (GIỮ NGUYÊN FORMAT CŨ) ---------------- */}
       <div className="mt-3 flex items-center justify-between">
         <div className="flex gap-2">
           <button
@@ -469,9 +470,7 @@ export default function ClassStudentList() {
       </div>
 
       {/* ---------------- MODALS ---------------- */}
-      {editUID && (
-        <ModalEditStudent uid={editUID} onClose={() => setEditUID(null)} />
-      )}
+      {editUID && <ModalEditStudent uid={editUID} onClose={() => setEditUID(null)} />}
 
       {sendNotifUID && (
         <ModalSendNotification
